@@ -91,7 +91,7 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 		// Step 2: prepare unlock
 		CopyMemory(&LockBlock, Manager->m_ResourceFile->GetFileData(), 0x70);
 		Manager->DfuUnlock(LockBlock);
-		
+
 		// Get status and wait
 		Status = Manager->GetStatusAndWait();
 		if (Status.State != DfuController::Idle)
@@ -268,8 +268,6 @@ DfuController::DfuStatus FirmwareManager::GetStatusAndWait(VOID)
 
 VOID FirmwareManager::LoadFirmware(_In_ CONST BOOL IgnoreModificationPurpose)
 {
-	m_ResourceFile.reset();
-
 	try
 	{
 		if (m_Modification == FirmwareModificationPurpose::InstallCustomFirmware)
@@ -345,17 +343,12 @@ VOID FirmwareManager::UpdateDescriptors(VOID)
 	GetDeviceDescriptors();
 
 	// Prepare semantic version object information
-	std::wstring WsSemVer = GetFirmwareVersion();
-	std::wstring_convert<std::codecvt_utf8_utf16<WCHAR>> Converter;
-	std::string SemVer = Converter.to_bytes(WsSemVer);
-
-	// Reset SemanticVersion object
-	m_SemanticVersion.reset();
+	std::wstring_view WideStrVersion = GetFirmwareVersion();
 
 	try
 	{
 		// Initialize a new SemanticVersion object
-		m_SemanticVersion = std::make_unique<SemanticVersion>(SemVer);
+		m_SemanticVersion = std::make_unique<SemanticVersion>(App->UnicodeToAnsi(WideStrVersion.data()));
 
 		// Build display string
 		std::wstring DescriptorText =
@@ -363,7 +356,7 @@ VOID FirmwareManager::UpdateDescriptors(VOID)
 			L"Product Name: " + GetProduct() + L"\r\n" +
 			L"Serial Number: " + GetSerialNumber() + L"\r\n" +
 			L"Bootloader Version: " + GetBootloaderVersion() + L"\r\n" +
-			L"Firmware Version: " + WsSemVer.data();
+			L"Firmware Version: " + WideStrVersion.data();
 
 		// Print to Edit control
 		SetWindowText(App->GetFirmwareDialog().GetDescriptorEditHandle(), DescriptorText.c_str());

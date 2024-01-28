@@ -6,12 +6,12 @@
 #endif
 
 class CommandBase;
+class MkFile;
 
 class CronusZen : public HidDeviceBase
 {
 public:
-
-	// Publically accessible enumeration for command identifiers
+	// Publically accessible enumeration of command identifiers
 	enum PacketID : UCHAR {
 		INPUTREPORT = 0x01,
 		OUTPUTREPORT = 0x02,
@@ -79,8 +79,160 @@ protected:
 	BOOL OnWrite(_In_ CONST DWORD BytesWritten);
 
 private:
+
+	CONST std::wstring m_OperationalMode[3] = {
+		L"wheel", L"normal", L"tournament"
+	};
+
+	CONST std::wstring m_OutputMode[7] = {
+		L"auto", L"PlayStation 3", L"PC/Mobile/Xbox 360", L"PlayStation 4", L"Xbox One Series S|X", L"Nintendo Switch", L"PlayStation 5"
+	};
+
+	CONST std::wstring m_RemoteSlot[3] = {
+		L"disabled", L"PS & Share / Xbox & View", L"PS & L3 / Xbox & LS"
+	};
+
+	enum OperationalModeList : UCHAR {
+		WheelMode = 0,
+		GamepadMode,
+		TournamentMode
+	};
+
+	enum OutputModeList : UCHAR {
+		Auto = 0,
+		PlayStation3,
+		Xbox360,
+		PlayStation4,
+		XboxOne,
+		NintendoSwitch,
+		PlayStation5
+	};
+
+	enum RemoteSlotChangeList : UCHAR {
+		Disabled = 0,
+		PS_Share = 0,
+		PS_L3
+	};
+
+	enum SourceType : UCHAR {
+		UnknownCfg = 0,
+		GeneralCfg,
+		MouseCfg,
+		KeyboardCfg,
+		NavconCfg,
+		GenericCfg,
+		G13Cfg,
+		Cfgs = 16,
+		UnusedCfg = 255
+	};
+
+#pragma pack(1)
+	struct AttachedDevice {
+		USHORT VendorID;
+		USHORT ProductID;
+		UCHAR Level;
+		UCHAR Port;
+		UCHAR DAddress;
+		UCHAR Parent;
+		BOOLEAN IsHub;
+	};
+
+	struct DeviceStatus {
+		UCHAR Status;
+		UCHAR Command;
+		UCHAR Error;
+		UCHAR Unknown;
+		UINT Crc32;
+		USHORT PayloadLength;
+	};
+
+	struct ExclusionListData {
+		UCHAR ExclusionListKeyboard[28] = { 0 };
+		UCHAR ExclusionListMouse[28] = { 0 };
+	};
+
+	struct FragmentData {
+		UCHAR ID;
+		SourceType Source;
+		UCHAR Value;
+		UCHAR Value2;
+	};
+
+	struct PVarConfigData {
+		USHORT Zero;
+		UINT Value;
+	};
+
+	struct SettingsLayout {
+		UCHAR BtnMaps[22] = { 0xff };
+		UCHAR MouseMaps[22] = { 0xff };
+		UCHAR MouseKeybMaps[22] = {0xff};
+		UCHAR NavconMaps[22] = {0xff};
+		UCHAR RightStickMaps[4] = { 0xff };
+		UCHAR LeftStickMaps[4] = { 0xff };
+		UCHAR LightbarPercent;
+		OperationalModeList OperationalMode;
+		OutputModeList OutputMode;
+		RemoteSlotChangeList RemoteSlot;
+		BOOLEAN Ps4Specialty;
+		BOOLEAN RemotePlay;
+	};
+
+	struct SlotConfigData {
+		USHORT GamepackID;
+		USHORT Unknown1;
+		UCHAR Flags;
+		UCHAR Unknown2;
+		UCHAR ConfigPVars;
+		UCHAR Slot;
+		UCHAR Unknown3[44] = { 0 };
+		UCHAR Title[52] = { 0 };
+		UCHAR Unknown4[12] = { 0 };
+		USHORT ByteCodeLength;
+		USHORT Unknown5;
+		UINT Unknown6;
+		PVarConfigData ConfigData[64] = { 0 };
+	};
+#pragma pack()
+
+	struct UnexpectedSize {
+		std::wstring Command;
+		std::size_t Received;
+		USHORT Expected;
+	};
+
 	std::deque<PUCHAR> m_Queue;
 
+	std::unique_ptr<AttachedDevice[]> m_AttachedDevices;
+	std::unique_ptr<ExclusionListData> m_ExclusionList;
+	std::unique_ptr<FragmentData[]> m_Fragments;
+	std::unique_ptr<MkFile> m_MkFile;
+	std::unique_ptr<SlotConfigData[]> m_SlotConfig;
+
+	// Firmware version information
+	std::unique_ptr<SemanticVersion> m_SemanticVersion;
+	
+	// Read command processing
+	std::unique_ptr<ParseBuffer> m_ParseBuffer;
+	std::unique_ptr<StoreBuffer> m_PreparseBuffer;
+	USHORT m_PayloadLength = 0;
+
+	UCHAR m_Checksum[4] = { NULL };
+	std::wstring m_Firmware;
+	std::wstring m_Serial;
+
+	SettingsLayout m_Settings;
+
+	VOID OnExclusionListRead(VOID);
+	VOID OnFragmentRead(VOID);
+	VOID OnGetFirmware(VOID);
+	VOID OnGetSerial(VOID);
+	VOID OnGetStatus(VOID);
+	VOID OnReadSlotsCfg(VOID);
+	VOID OnRequestAttachedDevices(VOID);
+	VOID OnRequestMkFile(VOID);
+
+	VOID HandleReadCommand(_In_ CONST PUCHAR PacketData, _In_ CONST std::size_t PacketSize);
 	VOID SendInitialCommunication(VOID);
 	VOID QueueCommand(_In_ CONST UCHAR Count, CommandBase& Command);
 };
@@ -102,10 +254,22 @@ public:
 	}
 };
 
+class ExclusionListReadCommand : public CommandBase
+{
+public:
+	explicit ExclusionListReadCommand(VOID) : CommandBase(CronusZen::PacketID::EXCLUSIONLISTREAD) { };
+};
+
 class ExitApiModeCommand : public CommandBase
 {
 public:
 	explicit ExitApiModeCommand(VOID) : CommandBase(CronusZen::PacketID::EXITAPIMODE) { };
+};
+
+class FragmentReadCommand : public CommandBase
+{
+public:
+	explicit FragmentReadCommand(VOID) : CommandBase(CronusZen::PacketID::FRAGMENTREAD) { };
 };
 
 class GetFirmwareCommand : public CommandBase
@@ -118,6 +282,31 @@ class GetSerialCommand : public CommandBase
 {
 public:
 	explicit GetSerialCommand(VOID) : CommandBase(CronusZen::PacketID::GETSERIAL) { };
+};
+
+
+class GetStatusCommand : public CommandBase
+{
+public:
+	explicit GetStatusCommand(VOID) : CommandBase(CronusZen::PacketID::GETSTATUS) { };
+};
+
+class ReadSlotsCfgCommand : public CommandBase
+{
+public:
+	explicit ReadSlotsCfgCommand(VOID) : CommandBase(CronusZen::PacketID::READSLOTSCFG) { };
+};
+
+class RequestAttachedDevicesCommand : public CommandBase
+{
+public:
+	explicit RequestAttachedDevicesCommand(VOID) : CommandBase(CronusZen::PacketID::REQUESTATTACHEDDEVICES) { };
+};
+
+class RequestMkFileCommand : public CommandBase
+{
+public:
+	explicit RequestMkFileCommand(VOID) : CommandBase(CronusZen::PacketID::REQUESTMKFILE) { };
 };
 
 class StreamIoStatusCommand : public CommandBase

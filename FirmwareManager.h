@@ -29,6 +29,7 @@ public:
 	BOOL UpdateCompleted(VOID) CONST;
 	SemanticVersion& GetVersionInfo(VOID) CONST;
 	BOOL PerformModification(VOID);
+	VOID Upload(VOID);
 
 protected:
 	// Protected member for modification state

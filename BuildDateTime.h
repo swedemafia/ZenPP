@@ -5,7 +5,7 @@
 #pragma once
 #endif
 
-#define BUILD_DATE L"24 Jan 2024"
-#define BUILD_TIME L"22:46:00"
+#define BUILD_DATE L"28 Jan 2024"
+#define BUILD_TIME L"00:07:34"
 
 #endif

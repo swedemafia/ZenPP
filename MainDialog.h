@@ -9,15 +9,19 @@ class MainDialog : public DialogBase
 {
 public:
 	// Destructor for cleanup
-	~MainDialog();
+	~MainDialog() = default;
 
 	// Public method for menu handle retrieval
 	HMENU GetMenuHandle(VOID) CONST;
 
 	// Public methods for displaying RichEdit messages
-	VOID DisplayAdministratorStatus(VOID) CONST;
-	VOID DisplayStartupInfo(VOID) CONST;
-	VOID DisplaySupportInfo(VOID) CONST;
+	VOID DisplayAdministratorStatus(VOID);
+	VOID DisplayStartupInfo(VOID);
+	VOID DisplaySupportInfo(VOID);
+
+	// Public methods for device management
+	VOID UpdateFeatureAvailability(_In_ CONST BOOL Enabled);
+	VOID UpdateSlotsData(_In_ CONST UCHAR SlotsUsed, _In_ CONST UINT BytesUsed);
 
 protected:
 	// Protected callback method for central window message processing
@@ -36,6 +40,8 @@ private:
 	HWND m_hWndSlotsTitle = NULL;
 
 	// Private methods for handling specific commands
+	INT_PTR OnCommandConnectionDisconnect(VOID);
+	INT_PTR OnCommandConnectionReconnect(VOID);
 	INT_PTR OnCommandFileExit(VOID);
 	INT_PTR OnCommandFirmwareCompatible(VOID);
 	INT_PTR OnCommandFirmwareCustom(VOID);
@@ -49,6 +55,7 @@ private:
 	INT_PTR OnCommand(_In_ CONST WPARAM wParam, _In_ CONST LPARAM lParam);
 	INT_PTR OnCtlColorListBox(_In_ CONST WPARAM wParam);
 	INT_PTR OnCtlColorStatic(_In_ CONST WPARAM wParam);
+	INT_PTR OnDeviceChange(_In_ CONST WPARAM wParam);
 	INT_PTR OnDestroy(VOID);
 	INT_PTR OnGetMinMaxInfo(_In_ CONST LPARAM lParam);
 	INT_PTR OnInitDialog(VOID);

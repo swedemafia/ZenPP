@@ -20,48 +20,51 @@ DeviceLocatorBase::DeviceLocatorBase(CONST std::wstring& DeviceName, CONST std::
 
 BOOL DeviceLocatorBase::FindDevice(VOID)
 {
-	// Query installed USB devices that are present to the system
-	HDEVINFO DevInfo = SetupDiGetClassDevsW(NULL, L"USB", NULL, DIGCF_ALLCLASSES | DIGCF_PRESENT);
-	
+	// Get handle to device information set
+	auto DevInfo = std::unique_ptr<void, decltype(&SetupDiDestroyDeviceInfoList)>(
+		SetupDiGetClassDevs(NULL, L"USB", nullptr, DIGCF_PRESENT | DIGCF_ALLCLASSES),
+		SetupDiDestroyDeviceInfoList
+	);
+
 	try
 	{
 		// Validate device info set
-		if (DevInfo == INVALID_HANDLE_VALUE)
+		if (DevInfo.get() == INVALID_HANDLE_VALUE)
 			throw std::wstring(L"An error occured while querying SetupDiGetClassDevs.");
 
 		DWORD MemberIndex = 0;
 		SP_DEVINFO_DATA DeviceInfoData = { sizeof(SP_DEVINFO_DATA) };
 
-		while (SetupDiEnumDeviceInfo(DevInfo, MemberIndex++, &DeviceInfoData)) {
+		while (SetupDiEnumDeviceInfo(DevInfo.get(), MemberIndex++, &DeviceInfoData)) {
 			DEVPROPTYPE PropertyType = { NULL };
 			DWORD RequiredSize = 0;
 
 			// Bus Reported Device Description
-			if (!SetupDiGetDeviceProperty(DevInfo, &DeviceInfoData, &DEVPKEY_Device_BusReportedDeviceDesc, &PropertyType, (PBYTE)m_BusReportedDeviceDescription.data(), 0, &RequiredSize, 0)) {
+			if (!SetupDiGetDeviceProperty(DevInfo.get(), &DeviceInfoData, &DEVPKEY_Device_BusReportedDeviceDesc, &PropertyType, (PBYTE)m_BusReportedDeviceDescription.data(), 0, &RequiredSize, 0)) {
 				m_BusReportedDeviceDescription.resize(RequiredSize / sizeof(WCHAR));
-				if (!SetupDiGetDeviceProperty(DevInfo, &DeviceInfoData, &DEVPKEY_Device_BusReportedDeviceDesc, &PropertyType, (PBYTE)m_BusReportedDeviceDescription.data(), m_BusReportedDeviceDescription.size() * sizeof(WCHAR), NULL, 0)) {
+				if (!SetupDiGetDeviceProperty(DevInfo.get(), &DeviceInfoData, &DEVPKEY_Device_BusReportedDeviceDesc, &PropertyType, (PBYTE)m_BusReportedDeviceDescription.data(), m_BusReportedDeviceDescription.size() * sizeof(WCHAR), NULL, 0)) {
 					continue;
 				}
 			}
 
 			// Device Description
-			if (!SetupDiGetDeviceRegistryProperty(DevInfo, &DeviceInfoData, SPDRP_DEVICEDESC, &PropertyType, (PBYTE)m_DeviceDescription.data(), 0, &RequiredSize)) {
+			if (!SetupDiGetDeviceRegistryProperty(DevInfo.get(), &DeviceInfoData, SPDRP_DEVICEDESC, &PropertyType, (PBYTE)m_DeviceDescription.data(), 0, &RequiredSize)) {
 				m_DeviceDescription.resize(RequiredSize / sizeof(WCHAR));
-				if (!SetupDiGetDeviceRegistryProperty(DevInfo, &DeviceInfoData, SPDRP_DEVICEDESC, &PropertyType, (PBYTE)m_DeviceDescription.data(), m_DeviceDescription.size() * sizeof(WCHAR), NULL)) {
+				if (!SetupDiGetDeviceRegistryProperty(DevInfo.get(), &DeviceInfoData, SPDRP_DEVICEDESC, &PropertyType, (PBYTE)m_DeviceDescription.data(), m_DeviceDescription.size() * sizeof(WCHAR), NULL)) {
 					break;
 				}
 			}
 
 			// Hardware ID
-			if (!SetupDiGetDeviceRegistryProperty(DevInfo, &DeviceInfoData, SPDRP_HARDWAREID, &PropertyType, (PBYTE)m_HardwareID.data(), 0, &RequiredSize)) {
+			if (!SetupDiGetDeviceRegistryProperty(DevInfo.get(), &DeviceInfoData, SPDRP_HARDWAREID, &PropertyType, (PBYTE)m_HardwareID.data(), 0, &RequiredSize)) {
 				m_HardwareID.resize(RequiredSize / sizeof(WCHAR));
-				if (!SetupDiGetDeviceRegistryProperty(DevInfo, &DeviceInfoData, SPDRP_HARDWAREID, &PropertyType, (PBYTE)m_HardwareID.data(), m_HardwareID.size() * sizeof(WCHAR), NULL)) {
+				if (!SetupDiGetDeviceRegistryProperty(DevInfo.get(), &DeviceInfoData, SPDRP_HARDWAREID, &PropertyType, (PBYTE)m_HardwareID.data(), m_HardwareID.size() * sizeof(WCHAR), NULL)) {
 					break;
 				}
 			}
 
-			// Compare for device matching
-			if (_wcsnicmp(m_BusReportedDeviceDescription.c_str(), m_DeviceName.c_str(), m_DeviceName.size()) == 0) {
+			m_BusReportedDeviceDescription.pop_back();
+			if(m_BusReportedDeviceDescription == m_DeviceName) {
 				// Create a pattern to search for Vendor and Product IDs
 				std::wregex Pattern(L"VID_(....)&PID_(....)");
 				std::wsmatch Matches;
@@ -69,7 +72,6 @@ BOOL DeviceLocatorBase::FindDevice(VOID)
 				if (std::regex_search(m_HardwareID, Matches, Pattern)) {
 					m_VendorID = Matches[1].str();
 					m_ProductID = Matches[2].str();
-
 					return FindDevicePath();
 				}
 

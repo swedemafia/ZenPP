@@ -1,11 +1,7 @@
 #include "Precomp.h"
 
-MainDialog::~MainDialog()
-{
-	PostQuitMessage(0);
-}
-
-VOID MainDialog::DisplayAdministratorStatus(VOID) CONST
+// Method for displaying information regarding administrative privileges
+VOID MainDialog::DisplayAdministratorStatus(VOID)
 {
 	if (!App->IsAdministrator()) {
 		PrintTimestamp();
@@ -16,12 +12,13 @@ VOID MainDialog::DisplayAdministratorStatus(VOID) CONST
 	}
 }
 
-VOID MainDialog::DisplayStartupInfo(VOID) CONST
+// Method for displaying the startup greeting
+VOID MainDialog::DisplayStartupInfo(VOID)
 {
 	// Set dialog caption
 	SetTitle(L"Zen++ Copyright © 2023-2024 Swedemafia");
 
-	// Display greeting to RichEdit
+	// Display greeting
 	PrintTimestamp();
 	PrintText(TEAL, L"Zen++ Copyright © 2023-2024 Swedemafia - version %u.%u.%u.\r\n", VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
 	PrintTimestamp();
@@ -35,10 +32,50 @@ VOID MainDialog::DisplayStartupInfo(VOID) CONST
 #endif
 }
 
-VOID MainDialog::DisplaySupportInfo(VOID) CONST
+// Method to disable information about contacting support/system administrator for various issues
+VOID MainDialog::DisplaySupportInfo(VOID)
 {
 	PrintTimestamp();
 	PrintText(PURPLE, L"If you need further assistance, please refer to the Discord server (https://discord.gg/tGH7QxtPam) or contact your system administrator.\r\n");
+}
+
+// Method to enable/disable features based on the connection state
+VOID MainDialog::UpdateFeatureAvailability(CONST BOOL Enabled)
+{
+	// Enable/disable the "Disconnect From Device" menu item
+	EnableMenuItem(m_Menu, MENU_CONNECTION_DISCONNECT, MF_BYCOMMAND | (Enabled ? MF_ENABLED : MF_DISABLED));
+	EnableMenuItem(m_Menu, 3, MF_BYPOSITION | (Enabled ? MF_ENABLED : MF_DISABLED));
+	
+	// Refresh/redraw/force update to menu bar
+	DrawMenuBar(m_hWnd);
+
+	// Enable/disable buttons based on the connection state
+	for (unsigned i = BUTTON_MAIN_ADDSCRIPT; i <= BUTTON_MAIN_PROGRAMDEVICE; i++)
+		EnableWindow(GetDlgItem(m_hWnd, i), Enabled);
+}
+
+VOID MainDialog::UpdateSlotsData(CONST UCHAR SlotsUsed, CONST UINT BytesUsed)
+{
+	std::wstring SlotsString = L"";
+
+	if (!SlotsUsed) {
+		if (BytesUsed) {
+			SlotsString = L"Not connected";
+		}
+		else {
+			SlotsString = L"No slots configuration";
+		}
+	}
+	else {
+		SlotsString = std::to_wstring(SlotsUsed) + L" slot";
+		if (SlotsUsed > 1) {
+			SlotsString += L"s";
+		}
+		SlotsString += L" (" + std::to_wstring(BytesUsed) + L" bytes, " + std::to_wstring(262120 - BytesUsed) + L" free)";
+	}
+
+	// Update edit box caption
+	SetWindowText(m_hWndSlotsTitle, SlotsString.c_str());
 }
 
 HMENU MainDialog::GetMenuHandle(VOID) CONST
@@ -57,6 +94,7 @@ INT_PTR MainDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONST
 	case WM_CTLCOLORLISTBOX:		return Dialog->OnCtlColorListBox(wParam);
 	case WM_CTLCOLORSTATIC:			return Dialog->OnCtlColorStatic(wParam);
 	case WM_DESTROY:				return Dialog->OnDestroy();
+	case WM_DEVICECHANGE:			return Dialog->OnDeviceChange(wParam);
 	case WM_INITDIALOG:				return Dialog->OnInitDialog();
 	case WM_GETMINMAXINFO:			return Dialog->OnGetMinMaxInfo(lParam);
 	case WM_NOTIFY:					return Dialog->OnNotify(lParam);
@@ -76,15 +114,30 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 {
 	switch (LOWORD(wParam))
 	{
+	case MENU_CONNECTION_DISCONNECT:				return OnCommandConnectionDisconnect();
+	case MENU_CONNECTION_RECONNECT:					return OnCommandConnectionReconnect();
 	case MENU_FILE_EXIT:							return OnCommandFileExit();
 	case MENU_FIRMWARE_COMPATIBLE:					return OnCommandFirmwareCompatible();
 	case MENU_FIRMWARE_CUSTOM:						return OnCommandFirmwareCustom();
 	case MENU_FIRMWARE_ERASE:						return OnCommandFirmwareErase();
 	case MENU_FIRMWARE_LATEST:						return OnCommandFirmwareLatest();
 	case MENU_HELP_ABOUT:							return OnCommandHelpAbout();
-	case MENU_HELP_ZENPPNEWS:						return OnCommandHelpZenPPNews();
+	case MENU_HELP_NEWS:						return OnCommandHelpZenPPNews();
 	}
 	return FALSE;
+}
+
+INT_PTR MainDialog::OnCommandConnectionDisconnect(VOID)
+{
+	App->GetCronusZen().DisconnectFromDevice();
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandConnectionReconnect(VOID)
+{
+	App->GetCronusZen().DisconnectFromDevice();
+	App->GetCronusZen().ConnectToDevice();
+	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandFileExit(VOID)
@@ -148,7 +201,19 @@ INT_PTR MainDialog::OnCtlColorStatic(CONST WPARAM wParam)
 INT_PTR MainDialog::OnDestroy(VOID)
 {
 	SetWindowLongPtr(m_hWnd, GWLP_USERDATA, (LONG)NULL);
-	PostQuitMessage(0);
+	App->QuitProgram();
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnDeviceChange(CONST WPARAM wParam)
+{
+	// When a device arrives or is removed
+	if (wParam == DBT_DEVICEARRIVAL)
+	{
+		// Attempt to connect when a device arrives to the system
+		App->GetCronusZen().ConnectToDevice();
+	}
+
 	return TRUE;
 }
 
@@ -164,6 +229,12 @@ INT_PTR MainDialog::OnInitDialog(VOID)
 	m_hWndSlotsListBox = GetDlgItem(m_hWnd, LIST_MAIN_SLOTS);
 	m_hWndSlotsTitle = GetDlgItem(m_hWnd, EDIT_MAIN_SLOTS);
 	m_Menu = GetMenu(m_hWnd);
+
+	// Register device change notifications
+	RegisterDeviceNotifications(App->GetCronusZen().GetGUID());
+
+	// Update slots manager information
+	UpdateSlotsData(0, 1);
 
 	return TRUE;
 }

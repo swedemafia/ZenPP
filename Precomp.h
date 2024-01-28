@@ -36,6 +36,7 @@
 
 // Utilities:
 #include "File.h"
+#include "ParseBuffer.h"
 #include "PopupMenu.h"
 #include "ResourceFile.h"
 #include "SemanticVersion.h"
@@ -53,6 +54,7 @@
 #include "CronusZen.h"
 #include "DfuController.h"
 #include "FirmwareManager.h"
+#include "MkFile.h"
 #include "VersionCheck.h"
 
 // Dialogs:

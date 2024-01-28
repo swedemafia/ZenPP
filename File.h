@@ -9,16 +9,19 @@ class File
 {
 public:
 	// Constructor for initialization
+	explicit File(_In_ CONST std::wstring& FileName);
 	explicit File(_In_ CONST std::wstring& FileName, _In_ CONST DWORD DesiredAccess, _In_ CONST DWORD ShareMode, _In_ CONST DWORD CreationDisposition, _In_ CONST DWORD Flags, _In_ CONST BOOL QueryFileSize);
 	
 	// Destructor for cleanup
 	~File();
 
 	// Public methods for file operations
-	BOOL Open(VOID);
-    BOOL Open(_In_ CONST std::wstring& FileName, _In_ CONST DWORD DesiredAccess, _In_ CONST DWORD ShareMode, _In_ CONST DWORD CreationDisposition, _In_ CONST DWORD Flags, _In_ CONST BOOL QueryFileSize);
-	BOOL Read(_Out_writes_bytes_ (NumberOfBytesToRead) LPVOID Buffer, _In_ CONST DWORD NumberOfBytesToRead, _Out_ LPDWORD NumberOfBytesRead, _In_opt_ LPOVERLAPPED Overlapped);
-	BOOL Write(_In_reads_bytes_ (NumberOfBytesToWrite) LPCVOID Buffer, _In_ CONST DWORD NumberOfBytesToWrite, _Out_opt_ LPDWORD NumberOfBytesWritten, _In_opt_ LPOVERLAPPED Overlapped);
+	CONST BOOL Exists(VOID) CONST;
+	CONST BOOL Read(_Out_writes_bytes_ (NumberOfBytesToRead) LPVOID Buffer, _In_ CONST DWORD NumberOfBytesToRead, _Out_ LPDWORD NumberOfBytesRead, _In_opt_ LPOVERLAPPED Overlapped);
+	CONST BOOL Open(VOID);
+	CONST BOOL Open(_In_ CONST DWORD DesiredAccess, _In_ CONST DWORD ShareMode, _In_ CONST DWORD CreationDisposition, _In_ CONST DWORD Flags, _In_ CONST BOOL QueryFileSize);
+	CONST BOOL Open(_In_ CONST std::wstring& FileName, _In_ CONST DWORD DesiredAccess, _In_ CONST DWORD ShareMode, _In_ CONST DWORD CreationDisposition, _In_ CONST DWORD Flags, _In_ CONST BOOL QueryFileSize);
+	CONST BOOL Write(_In_reads_bytes_ (NumberOfBytesToWrite) LPCVOID Buffer, _In_ CONST DWORD NumberOfBytesToWrite, _Out_opt_ LPDWORD NumberOfBytesWritten, _In_opt_ LPOVERLAPPED Overlapped);
 	VOID Close(VOID);
 
 	// Public methods for file information retrieval

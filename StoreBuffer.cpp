@@ -1,14 +1,14 @@
 #include "Precomp.h"
 
 // Constructor initializes members and allocates initial buffer
-StoreBuffer::StoreBuffer(SIZE_T SizeHint) :
+StoreBuffer::StoreBuffer(std::size_t SizeHint) :
 	m_Size(SizeHint), m_Position(0), m_ValidSize(0)
 {
 	m_Buffer = std::make_unique<UCHAR[]>(SizeHint);
 }
 
 // Allocated buffer size retrieval
-CONST SIZE_T StoreBuffer::AllocatedSize(VOID) CONST
+CONST std::size_t StoreBuffer::AllocatedSize(VOID) CONST
 {
     return m_Size;
 }
@@ -20,13 +20,13 @@ CONST PUCHAR StoreBuffer::Buffer(VOID) CONST
 }
 
 // Current position within buffer retrieval
-CONST SIZE_T StoreBuffer::Position(VOID) CONST
+CONST std::size_t StoreBuffer::Position(VOID) CONST
 {
     return m_Position;
 }
 
 // Valid data size retrieval
-CONST SIZE_T StoreBuffer::Size(VOID) CONST
+CONST std::size_t StoreBuffer::Size(VOID) CONST
 {
     return m_ValidSize;
 }
@@ -41,16 +41,16 @@ PUCHAR StoreBuffer::Buffer(VOID)
 VOID StoreBuffer::InsertByte(CONST UCHAR Byte)
 {
     InternalExpand(1);
-    m_Buffer.get()[m_Position] = Byte;
+    m_Buffer[m_Position] = Byte;
     m_Position++;
     UpdateValidSize();
 }
 
 // Inserts raw data into the buffer
-VOID StoreBuffer::InsertData(CONST LPVOID Data, CONST SIZE_T Size)
+VOID StoreBuffer::InsertData(CONST LPVOID Data, CONST std::size_t Size)
 {
     InternalExpand(Size);
-    std::memcpy(&m_Buffer.get()[m_Position], Data, Size);
+    std::memcpy(&m_Buffer[m_Position], Data, Size);
     m_Position += Size;
     UpdateValidSize();
 }
@@ -59,7 +59,7 @@ VOID StoreBuffer::InsertData(CONST LPVOID Data, CONST SIZE_T Size)
 VOID StoreBuffer::InsertLong(CONST ULONG Long)
 {
     InternalExpand(4);
-    *(PULONG)&m_Buffer.get()[m_Position] = Long;
+    *(PULONG)&m_Buffer[m_Position] = Long;
     m_Position += 4;
     UpdateValidSize();
 }
@@ -68,7 +68,7 @@ VOID StoreBuffer::InsertLong(CONST ULONG Long)
 VOID StoreBuffer::InsertLongLong(CONST ULONGLONG LongLong)
 {
     InternalExpand(8);
-    *(PULONGLONG)&m_Buffer.get()[m_Position] = LongLong;
+    *(PULONGLONG)&m_Buffer[m_Position] = LongLong;
     m_Position += 8;
     UpdateValidSize();
 }
@@ -77,7 +77,7 @@ VOID StoreBuffer::InsertLongLong(CONST ULONGLONG LongLong)
 VOID StoreBuffer::InsertShort(CONST USHORT Short)
 {
     InternalExpand(2);
-    *(PUSHORT)&m_Buffer.get()[m_Position] = Short;
+    *(PUSHORT)&m_Buffer[m_Position] = Short;
     m_Position += 2;
     UpdateValidSize();
 }
@@ -85,9 +85,9 @@ VOID StoreBuffer::InsertShort(CONST USHORT Short)
 // Inserts a null-terminated ANSI string into the buffer
 VOID StoreBuffer::InsertStringA(CONST PSTR String)
 {
-    SIZE_T Length = strlen(String) + 1;
+    std::size_t Length = strlen(String) + 1;
     InternalExpand(Length);
-    std::memcpy(&m_Buffer.get()[m_Position], String, Length);
+    std::memcpy(&m_Buffer[m_Position], String, Length);
     m_Position += Length;
     UpdateValidSize();
 }
@@ -95,9 +95,9 @@ VOID StoreBuffer::InsertStringA(CONST PSTR String)
 // Inserts a null-terminated ANSI string from an std::string into the buffer
 VOID StoreBuffer::InsertStringA(CONST std::string& String)
 {
-    SIZE_T Length = String.size() + 1;
+    std::size_t Length = String.size() + 1;
     InternalExpand(Length);
-    std::memcpy(&m_Buffer.get()[m_Position], String.c_str(), Length);
+    std::memcpy(&m_Buffer[m_Position], String.c_str(), Length);
     m_Position += Length;
     UpdateValidSize();
 }
@@ -105,9 +105,9 @@ VOID StoreBuffer::InsertStringA(CONST std::string& String)
 // Inserts a null-terminated wide string into the buffer
 VOID StoreBuffer::InsertStringW(CONST PWSTR String)
 {
-    SIZE_T Length = (wcslen(String) << 1) + 2;
+    std::size_t Length = (wcslen(String) << 1) + 2;
     InternalExpand(Length);
-    std::memcpy(&m_Buffer.get()[m_Position], String, Length);
+    std::memcpy(&m_Buffer[m_Position], String, Length);
     m_Position += Length;
     UpdateValidSize();
 }
@@ -115,15 +115,15 @@ VOID StoreBuffer::InsertStringW(CONST PWSTR String)
 // Inserts a null-terminated wide string from an std::wstring into the buffer
 VOID StoreBuffer::InsertStringW(CONST std::wstring& String)
 {
-    SIZE_T Length = (String.size() << 1) + 2;
+    std::size_t Length = (String.size() << 1) + 2;
     InternalExpand(Length);
-    std::memcpy(&m_Buffer.get()[m_Position], String.c_str(), Length);
+    std::memcpy(&m_Buffer[m_Position], String.c_str(), Length);
     m_Position += Length;
     UpdateValidSize();
 }
 
 // Internally expands the buffer if the required space exceeds the current capacity
-VOID StoreBuffer::InternalExpand(CONST SIZE_T RequiredBytes)
+VOID StoreBuffer::InternalExpand(CONST std::size_t RequiredBytes)
 {
     if (m_Position + RequiredBytes > m_Size) {
         // Resize to either double the current size or accomdate the required bytes, whichever is larger
@@ -132,8 +132,9 @@ VOID StoreBuffer::InternalExpand(CONST SIZE_T RequiredBytes)
 }
 
 // Resizes the buffer to a new capacity
-VOID StoreBuffer::Resize(CONST SIZE_T NewSize) {
-    PUCHAR NewBuffer = reinterpret_cast<PUCHAR>(std::realloc(m_Buffer.release(), NewSize));
+VOID StoreBuffer::Resize(CONST std::size_t NewSize)
+{
+    PUCHAR NewBuffer = reinterpret_cast<PUCHAR>(std::realloc(m_Buffer.release(), NewSize + 2));
 
     if (!NewBuffer)
         throw std::bad_alloc();
@@ -143,7 +144,7 @@ VOID StoreBuffer::Resize(CONST SIZE_T NewSize) {
 }
 
 // Sets the position within the buffer, expanding if needed
-VOID StoreBuffer::SetPosition(CONST SIZE_T NewPosition)
+VOID StoreBuffer::SetPosition(CONST std::size_t NewPosition)
 {
     if (NewPosition > m_Size)
         InternalExpand(NewPosition - m_Size);

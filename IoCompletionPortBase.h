@@ -24,6 +24,7 @@ public:
 
 	// Public method for associating an IOCP with a file handle
 	CONST BOOL AssociateWithIocp(_In_ CONST HANDLE FileHandle);
+	VOID CancelIocp(VOID);
 
 protected:
 	// Protected methods for IOCP information retrieval
@@ -32,6 +33,7 @@ protected:
 
 	// Protected methods to retrieve overlapped structures for IOCP events
 	LPOVERLAPPED GetOverlappedConnect(VOID);
+	LPOVERLAPPED GetOverlappedDisconnect(VOID);
 	LPOVERLAPPED GetOverlappedRead(VOID);
 	LPOVERLAPPED GetOverlappedWrite(VOID);
 

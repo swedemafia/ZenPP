@@ -82,10 +82,7 @@ VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 				PROCESS_INFORMATION ProcessInfo = { NULL };
 				STARTUPINFOA StartupInfo = { sizeof(STARTUPINFOA) };
 				m_VersionUpdater = std::make_unique<ResourceFile>(App->GetInstance(), FILE_ZPPUPDATER);
-				DWORD UpdateFileSize = m_VersionUpdater->GetFileSize();
 				std::unique_ptr<File> UpdateFile = std::make_unique<File>(L"ZppUpdater.exe", GENERIC_WRITE, FILE_SHARE_WRITE, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, TRUE);
-
-				// TODO: test and make sure this replacement code works!
 
 				if (!UpdateFile->Open())
 					throw std::wstring(L"An error occured while executing ZppUpdater.");
@@ -94,29 +91,6 @@ VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 					throw std::wstring(L"An error occured while creating ZppUpdater.");
 
 				UpdateFile->Close();
-
-
-				/*
-				// Create the updater
-				HANDLE UpdateFileHandle = CreateFile(L"ZppUpdater.exe", GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-
-				// Verify the file was opened
-				if (UpdateFileHandle == INVALID_HANDLE_VALUE)
-					throw std::wstring(L"An error occured while executing ZppUpdater.");
-
-				if (!WriteFile(UpdateFileHandle, m_VersionUpdater->GetFileData(), UpdateFileSize, &BytesWritten, NULL)) {
-					CloseHandle(UpdateFileHandle);
-					throw std::wstring(L"An error occured while creating ZppUpdater.");
-				}
-
-				if (BytesWritten != UpdateFileSize) {
-					CloseHandle(UpdateFileHandle);
-					throw std::wstring(L"An error occured while creating ZppUpdater (bytes written mismatch).");
-				}
-
-				// Close the written file
-				CloseHandle(UpdateFileHandle);
-				*/
 
 				// Launch updater
 				if (!CreateProcessA("ZppUpdater.exe", &m_CommandLine[0], NULL, NULL, TRUE, 0, NULL, NULL, &StartupInfo, &ProcessInfo)) {
@@ -160,6 +134,9 @@ VOID VersionCheck::HttpSessionDataCallback(CONST std::deque<std::string> Respons
 			}
 			else if (!Command.compare("news")) {
 				ProcessNewsCommand(LIGHTGREEN, Text);
+			}
+			else if (!Command.compare("news2")) {
+				ProcessNewsCommand(YELLOW, Text);
 			}
 			else if (!Command.compare("notice")) {
 				ProcessAlertCommand(MB_ICONINFORMATION, Text.data());

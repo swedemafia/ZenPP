@@ -11,6 +11,7 @@ DWORD HttpSessionBase::HttpSessionThreadProc(LPVOID Parameter)
 {
 	HttpSessionBase* Base = reinterpret_cast<HttpSessionBase*>(Parameter);
 	HINTERNET Session = NULL, Connection = NULL, Request = NULL;
+
 	try
 	{
 		// Open HTTP session

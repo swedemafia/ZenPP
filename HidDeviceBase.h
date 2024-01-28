@@ -21,6 +21,8 @@ public:
 	VOID DisconnectFromDevice(VOID);
 
 protected:
+	std::unique_ptr<BYTE[]> m_ReceiveBuffer;
+
 	// Protected methods for querying HID device information
 	BOOL QueryHIDDeviceCapabilities(VOID);
 
@@ -29,10 +31,7 @@ protected:
 	VOID AsynchronousWrite(_In_ CONST PUCHAR Data);
 
 private:
-	std::unique_ptr<BYTE[]> m_ReceiveBuffer;
 	std::unique_ptr<File> m_Device;
-	std::unique_ptr<PHIDP_PREPARSED_DATA> m_PreparsedData;
-	std::unique_ptr<HIDP_CAPS> m_Capabilities;
 	USHORT m_ReadInputLength = 0;
 	USHORT m_WriteOutputLength = 0;
 };

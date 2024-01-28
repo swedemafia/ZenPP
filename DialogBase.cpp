@@ -12,6 +12,57 @@ DialogBase::~DialogBase()
 	// Unregister device notifications, if active
 	if (m_DeviceNotify)
 		UnregisterDeviceNotification(m_DeviceNotify);
+
+	if (m_RichEditThread != INVALID_HANDLE_VALUE)
+		CloseHandle(m_RichEditThread);
+}
+
+// Thread for RichEdit output
+DWORD DialogBase::RichEditThreadProc(LPVOID Parameter)
+{
+	DialogBase* Base = reinterpret_cast<DialogBase*>(Parameter);
+	
+	while (Base->m_RichEditThread != INVALID_HANDLE_VALUE) {
+		RichEditOutputData Data = Base->m_RichEditQueue.front();
+
+		// Prepare character formatting
+		CHARFORMAT CharFormat = { NULL };
+		CharFormat.cbSize = sizeof(CharFormat);
+		CharFormat.dwMask = CFM_COLOR;
+		CharFormat.crTextColor = Data.Color;
+
+		// Chunk loop
+		UINT Offset = 0;
+		UINT Length = Data.Text.size();
+
+		while (Offset < Length) {
+			// Calculate chunk size, ensuring it doesn't exceed remaining text
+			UINT ChunkSize = min(Length - Offset, 1024);
+
+			// Prepare stream data
+			EditStreamDataStruct EditStreamData{ ChunkSize, Data.Text.data() + Offset};
+
+			// Prepare EDITSTREAM data
+			EDITSTREAM EditStream = { NULL };
+			EditStream.dwCookie = (DWORD_PTR)&EditStreamData;
+			EditStream.pfnCallback = (EDITSTREAMCALLBACK)EditStreamCallback;
+
+			// Send messages for current chunk
+			SendMessage(Base->m_hWndRichEdit, EM_SETSEL, (WPARAM)-1, (LPARAM)-1);
+			SendMessage(Base->m_hWndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&CharFormat));
+			SendMessage(Base->m_hWndRichEdit, EM_STREAMIN, SF_TEXT | SF_UNICODE | SFF_SELECTION, reinterpret_cast<LPARAM>(&EditStream));
+
+			// Advance offset
+			Offset += ChunkSize;
+		}
+
+		Base->m_RichEditQueue.pop_front();
+
+		if (Base->m_RichEditQueue.empty())
+			SuspendThread(Base->m_RichEditThread);
+	}
+
+	return 0;
 }
 
 // Method to bring the dialog to the foreground
@@ -50,30 +101,30 @@ VOID DialogBase::Create(CONST UINT ResourceID)
 }
 
 // Callback method for RichEdit stream operations
-DWORD DialogBase::EditStreamCallback(DWORD_PTR dwCookie, LPBYTE pbBuff, LONG cb, LONG* pcb)
+DWORD DialogBase::EditStreamCallback(DWORD_PTR dwCookie, LPBYTE pbBuff, LONG cbBuff, LONG* pcbRead)
 {
-	// Cast the cookie to the custom edit stream structure
+	// Cast the cookie to the EditStreamDataStruct pointer
 	EditStreamDataStruct* OutputStream = reinterpret_cast<EditStreamDataStruct*>(dwCookie);
 
-	if (OutputStream) {
-		// Determine the number of characters to copy
-		*pcb = min(cb / sizeof(WCHAR), OutputStream->Length);
+	// Determine if there's any data to be streamed
+	if (OutputStream->Length) {
+		// Calculate how many characters can be read
+		DWORD CharactersToRead = min(OutputStream->Length, cbBuff);
 
-		if (*pcb > 0) {
-			// Copy characters from the stream to the provided buffer
-			wcsncpy_s((WCHAR*)pbBuff, *pcb + 1, OutputStream->Text, *pcb);
+		// Copy Unicode characters to the buffer
+		memcpy(pbBuff, OutputStream->Text, CharactersToRead << 1);
 
-			// Update the stream state for follow-up calls
-			OutputStream->Text += *pcb;  // Advance the text pointer
-			OutputStream->Length -= *pcb; // Decrease the remaining length
-		}
+		// Update the stream data for the next call
+		OutputStream->Text += CharactersToRead;
+		OutputStream->Length -= CharactersToRead;
 
-		// Success
-		return 0;
+		// Set the number of bytes that were processed
+		*pcbRead = (CharactersToRead << 1);
+
+		return 0; // Signal success and to keep streaming
 	}
 
-	// Signal an error if the cookie is invalid
-	return ERROR_INVALID_PARAMETER;
+	return ERROR_INVALID_PARAMETER; // No more data to stream
 }
 
 // Method to retrieve the dialog window handle
@@ -81,7 +132,6 @@ HWND DialogBase::GetHwnd(VOID) CONST
 {
 	// Return dialog window handle
 	return m_hWnd;
-
 }
 
 // Callback function for routing messages
@@ -104,6 +154,13 @@ INT_PTR DialogBase::MessageRouter(CONST HWND hWnd, CONST UINT Message, CONST WPA
 		else {
 			// Store window handle and dialog instance pointer for future access
 			Base->m_hWnd = hWnd;
+
+			// Create RichEdit thread
+			if ((Base->m_RichEditThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)RichEditThreadProc, (LPVOID)Base, CREATE_SUSPENDED, NULL)) == INVALID_HANDLE_VALUE) {
+				MessageBox(hWnd, L"An error occured while creating the RichEdit output thread.\r\n\r\nPlease restart the application or contact support for assistance.", L"Zen++", MB_ICONERROR | MB_OK);
+				App->QuitProgram();
+			}
+
 			SetWindowLongPtr(hWnd, GWLP_USERDATA, (LPARAM)Base);
 		}
 
@@ -125,52 +182,6 @@ INT_PTR DialogBase::MessageRouter(CONST HWND hWnd, CONST UINT Message, CONST WPA
 
 	// Delegate remaining messages to the dialog's HandleMessage method
 	return Base ? Base->HandleMessage(Message, wParam, lParam) : FALSE;
-}
-
-// Method for printing a timestamp in [HH:MM:SS] format to the dialog's RichEdit text box
-VOID DialogBase::PrintTimestamp(VOID) CONST
-{
-	// Retrieve current system time
-	SYSTEMTIME SystemTime;
-	GetSystemTime(&SystemTime);
-
-	// Format and print the timestamp in the color gray
-	PrintText(GRAY, L"[%02u:%02u:%02u] ", SystemTime.wHour, SystemTime.wMinute, SystemTime.wSecond);
-}
-
-// Method for printing colored and formatted text to the dialog's RichEdit text box
-VOID DialogBase::PrintText(COLORREF Color, LPCWSTR Format, ...) CONST
-{
-	// Prepare variable argument list
-	va_list argptr;
-	va_start(argptr, Format);
-
-	// Determine string length and allocate buffer
-	UINT Length = _vscwprintf(Format, argptr) + 1;
-	std::shared_ptr<WCHAR[]> Output(new WCHAR[Length]);
-	vswprintf_s(Output.get(), Length, Format, argptr);
-	va_end(argptr);
-
-	// Prepare character formatting
-	CHARFORMAT CharFormat = { NULL };
-	CharFormat.cbSize = sizeof(CharFormat);
-	CharFormat.dwMask = CFM_COLOR;
-	CharFormat.crTextColor = Color;
-
-	// Prepare stream data
-	std::shared_ptr<EditStreamDataStruct> EditStreamData = std::make_shared<EditStreamDataStruct>();
-	EditStreamData->Length = (Length << 1) - 1;
-	EditStreamData->Text = Output.get();
-
-	// Prepare EDITSTREAM data
-	EDITSTREAM EditStream = { NULL };
-	EditStream.dwCookie = (DWORD_PTR)EditStreamData.get();
-	EditStream.pfnCallback = (EDITSTREAMCALLBACK)EditStreamCallback;
-
-	// Send our messages to the RichEdit
-	SendMessage(m_hWndRichEdit, EM_SETSEL, (WPARAM)-1, (LPARAM)-1);
-	SendMessage(m_hWndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&CharFormat));
-	SendMessage(m_hWndRichEdit, EM_STREAMIN, SF_TEXT | SF_UNICODE | SFF_SELECTION, reinterpret_cast<LPARAM>(&EditStream));
 }
 
 // Subclassed window procedure for the RichEdit controls associated with DialogBase
@@ -206,6 +217,44 @@ BOOL DialogBase::RichEditCopySelectionToClipboard(VOID) CONST
 	SendMessage(m_hWndRichEdit, WM_COPY, 0, 0);
 
 	return TRUE;
+}
+
+// Method for printing a timestamp in [HH:MM:SS] format to the dialog's RichEdit text box
+VOID DialogBase::PrintTimestamp(VOID)
+{
+	// Retrieve current system time
+	SYSTEMTIME SystemTime;
+	GetLocalTime(&SystemTime);
+
+	// Format and print the timestamp in the color gray
+	PrintText(GRAY, L"[%02u:%02u:%02u] ", SystemTime.wHour, SystemTime.wMinute, SystemTime.wSecond);
+}
+
+// Method for printing colored and formatted text to the dialog's RichEdit text box
+VOID DialogBase::PrintText(COLORREF Color, LPCWSTR Format, ...)
+{
+	static INT counter = 0;
+
+	// Prepare variable argument list
+	va_list argptr;
+	va_start(argptr, Format);
+
+	// Determine string length
+	UINT Length = _vscwprintf(Format, argptr) + 1;
+
+	// Allocate buffer for current chunk
+	std::unique_ptr<WCHAR[]> Output(new WCHAR[Length]);  // Use unique_ptr for automatic cleanup
+
+	// Format the cunk using a modified format string adjusted by the offset
+	vswprintf_s(Output.get(), Length, Format, argptr);
+
+	// End use of argument pointer
+	va_end(argptr);
+
+	m_RichEditQueue.push_back(RichEditOutputData{ Color, std::wstring(Output.get()) });
+
+	if (m_RichEditQueue.size() == 1)
+		ResumeThread(m_RichEditThread);
 }
 
 // Method for initializing the RichEdit control
@@ -244,7 +293,6 @@ VOID DialogBase::RichEditInitialize(CONST UINT ResourceID, CONST std::wstring& F
 
 		// Subclass RichEdit
 		RichEditSubClass();
-
 	}
 	catch (CONST std::wstring& CustomMessage)
 	{

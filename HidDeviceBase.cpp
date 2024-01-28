@@ -16,26 +16,29 @@ HidDeviceBase::~HidDeviceBase()
 // Method for querying HID device preparsed data and capabilities
 BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 {
+	// Allocate memory for HID device preparsed data and capabilities
+	PHIDP_PREPARSED_DATA PreparsedData = NULL;
+	HIDP_CAPS Capabilities = { NULL };
+
 	try
 	{
-		// Allocate memory for HID device preparsed data and capabilities
-		m_PreparsedData = std::make_unique<PHIDP_PREPARSED_DATA>();
-		m_Capabilities = std::make_unique<HIDP_CAPS>();
-
 		// Retrieve preparsed data from the HID device
-		if (!HidD_GetPreparsedData(m_Device->GetHandle(), m_PreparsedData.get()))
+		if (!HidD_GetPreparsedData(m_Device->GetHandle(), &PreparsedData))
 			throw std::wstring(L"An error occured while querying HID device preparsed collection data.");
 
 		// Retrieve HID device capabilities
-		if (HidP_GetCaps(*m_PreparsedData.get(), m_Capabilities.get()) != HIDP_STATUS_SUCCESS)
+		if (HidP_GetCaps(PreparsedData, &Capabilities) != HIDP_STATUS_SUCCESS)
 			throw std::wstring(L"An error occored while querying HID device capabilities.");
 
 		// Store input and output report lengths as provided by capabilities
-		m_ReadInputLength = m_Capabilities.get()->InputReportByteLength;
-		m_WriteOutputLength = m_Capabilities.get()->OutputReportByteLength;
+		m_ReadInputLength = Capabilities.InputReportByteLength;
+		m_WriteOutputLength = Capabilities.OutputReportByteLength;
 
 		// Allocate receive buffer based on the input report length
 		m_ReceiveBuffer = std::make_unique<BYTE[]>(m_ReadInputLength);
+
+		// Free preparsed data
+		HidD_FreePreparsedData(PreparsedData);
 
 		return TRUE; // Signal success
 	}
@@ -48,48 +51,51 @@ BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 		App->DisplayError(CustomMessage);
 	}
 
+	// Free preparsed data
+	if(PreparsedData)
+		HidD_FreePreparsedData(PreparsedData);
+
 	return FALSE; // Signal failure
 }
 
 VOID HidDeviceBase::DisconnectFromDevice(VOID)
 {
-	// Determine if a device is currently located
-	if (m_Device.get()) {
-		// Close the connection to the device
-		m_Device->Close();
+	// Close out the IOCP
+	CancelIocp();
 
-		// Notify user that the device has been disconnected
-		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(RED, L"Disconnected from the Cronus Zen!\r\n");
+	// Free up File object used to connect to the device
+	if (m_Device.get()) {
+		// If the app is being terminated, no need to inform the user of the disconnection
+		if (!App->IsQuitting() && (m_Device->GetHandle() != INVALID_HANDLE_VALUE)) {
+			App->GetMainDialog().PrintTimestamp();
+			App->GetMainDialog().PrintText(RED, L"The connection to the Cronus Zen has been terminated.\r\n");
+			App->GetMainDialog().UpdateSlotsData(0, 1);
+			App->GetMainDialog().UpdateFeatureAvailability(FALSE);
+		}
+		m_Device->Close();
+		m_Device.reset();
 	}
 
-	// Free HID device preparsed data
-	if(m_PreparsedData.get())
-		HidD_FreePreparsedData(*m_PreparsedData.get());
-
-	// Reset unique_ptr's
-	m_PreparsedData.reset();
-	m_Capabilities.reset();
-	m_Device.reset();
+	// Suspend thread
+	SuspendThread(GetIocpThreadHandle());
 }
 
 // Method for scanning and calling to open a connection to the device
 VOID HidDeviceBase::ConnectToDevice(VOID)
 {
+	static int counter = 0;
+
 	// Query the target device
-	if (FindDevice()) {
+	if (FindDevice() && !m_Device.get()) {
 		// Notify user that the device has been located
 		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(GRAY, L"Attempting to open a connection to the Cronus Zen located at %ws...\r\n", GetDevicePath().c_str());
-
-		// Reset device file handle
-		m_Device.reset();
+		App->GetMainDialog().PrintText(GRAY, L"Attempting to connect to your Cronus Zen...\r\n");
 
 		try
 		{
 			// Create new device file handle
 			m_Device = std::make_unique<File>(GetDevicePath(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, FALSE);
-			
+
 			// Attempt to open a connection to the device
 			if (!m_Device->Open())
 				throw std::wstring(L"An error occured while opening a connection to the Cronus Zen.");
@@ -105,7 +111,6 @@ VOID HidDeviceBase::ConnectToDevice(VOID)
 			// Post completion status to IOCP to signal a successful connection
 			if (!PostQueuedCompletionStatus(GetIocpHandle(), 0, IocpCompletionKey::Connect, GetOverlappedConnect()))
 				throw std::wstring(L"An error occured while posting the connection completion status to the I/O completion port.");
-
 		}
 		catch (CONST std::wstring& CustomMessage) {
 			// Display the custom error message to the user

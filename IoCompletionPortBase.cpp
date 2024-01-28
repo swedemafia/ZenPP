@@ -12,13 +12,7 @@ IoCompletionPortBase::IoCompletionPortBase()
 // Destructor for closing potentially open handles to the IOCP and the IOCP event thread
 IoCompletionPortBase::~IoCompletionPortBase()
 {
-	// Release IOCP handle
-	if (m_IocpHandle != INVALID_HANDLE_VALUE)
-		CloseHandle(m_IocpHandle);
-
-	// Stop IOCP event thread, if running
-	if (m_IocpThreadHandle != INVALID_HANDLE_VALUE)
-		CloseHandle(m_IocpThreadHandle);
+	CancelIocp();
 }
 
 // Method for associating an open file (device) handle with an IOCP
@@ -50,6 +44,22 @@ CONST BOOL IoCompletionPortBase::AssociateWithIocp(CONST HANDLE FileHandle)
 	return TRUE; // Signal success
 }
 
+VOID IoCompletionPortBase::CancelIocp(VOID)
+{
+	// Release IOCP handle
+	if (m_IocpHandle != INVALID_HANDLE_VALUE) {
+		//CancelIo(m_IocpHandle);
+		CloseHandle(m_IocpHandle);
+		m_IocpHandle = INVALID_HANDLE_VALUE;
+	}
+
+	// Stop IOCP event thread, if running
+	if (m_IocpThreadHandle != INVALID_HANDLE_VALUE) {
+		CloseHandle(m_IocpThreadHandle);
+		m_IocpThreadHandle = INVALID_HANDLE_VALUE;
+	}
+}
+
 // Method for IOCP handle retrieval
 CONST HANDLE IoCompletionPortBase::GetIocpHandle(VOID) CONST
 {
@@ -65,6 +75,11 @@ CONST HANDLE IoCompletionPortBase::GetIocpThreadHandle(VOID) CONST
 LPOVERLAPPED IoCompletionPortBase::GetOverlappedConnect(VOID)
 {
 	return &m_OverlappedConnect.Overlapped;
+}
+
+LPOVERLAPPED IoCompletionPortBase::GetOverlappedDisconnect(VOID)
+{
+	return &m_OverlappedDisconnect.Overlapped;
 }
 
 LPOVERLAPPED IoCompletionPortBase::GetOverlappedRead(VOID)
@@ -86,7 +101,7 @@ DWORD IoCompletionPortBase::IocpEventThreadProc(LPVOID Parameter)
 	while (Base->m_IocpThreadHandle != INVALID_HANDLE_VALUE) {
 		// Completion event variables
 		DWORD NumberOfBytesTransferred = 0;
-		std::unique_ptr<LPOVERLAPPED> Overlapped(new LPOVERLAPPED);
+		std::unique_ptr<LPOVERLAPPED> Overlapped = std::make_unique<LPOVERLAPPED>();
 		ULONG_PTR CompletionKey = NULL;
 
 		// Query completion status for an IOCP event
@@ -98,9 +113,6 @@ DWORD IoCompletionPortBase::IocpEventThreadProc(LPVOID Parameter)
 			// Post queued completion status for the client device closing the connection 
 			PostQueuedCompletionStatus(Base->m_IocpHandle, 0, IocpCompletionKey::Disconnect, &Base->m_OverlappedDisconnect.Overlapped);
 		}
-
-		// Reset unique pointer
-		Overlapped.reset();
 	}
 
 	return 0; // Exit thread

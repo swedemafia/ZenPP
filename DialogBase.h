@@ -17,9 +17,9 @@ public:
     VOID Create(CONST UINT ResourceID);
     VOID SetTitle(CONST std::wstring& DialogTitle) CONST;
 
-    // Public methods for text output
-    VOID PrintTimestamp(VOID) CONST;
-    VOID PrintText(COLORREF Color, LPCWSTR Format, ...) CONST;
+    // Public methods for RichEdit output
+    VOID PrintTimestamp(VOID);
+    VOID PrintText(COLORREF Color, LPCWSTR Format, ...);
 
     // Public methods for RichEdit control
     VOID RichEditInitialize(CONST UINT ResourceID, CONST std::wstring& FontFace, CONST LONG Height, CONST LONG Offset);
@@ -27,6 +27,7 @@ public:
     VOID RichEditSubClass(VOID);
 
 protected:
+
     // Protected members for RichEdit control
     HWND m_hWndRichEdit = NULL;
     WNDPROC m_OriginalRichEditProc = NULL;
@@ -50,15 +51,28 @@ protected:
     VOID RegisterDeviceNotifications(CONST GUID Guid);
 
 private:
+    // Private struct for RichEdit output
+    struct RichEditOutputData {
+        COLORREF Color;
+        std::wstring Text;
+    };
+
+    // Private struct for EditStreamCallback
+    struct EditStreamDataStruct {
+        UINT Length;
+        PWCHAR Text;
+    };
+
     // Private members for dialog resources
     HICON m_Icon = NULL;
     HINSTANCE m_Instance = NULL;
 
-    // Private struct for EditStreamCallback
-    struct EditStreamDataStruct {
-        PWCHAR Text;
-        UINT Length;
-    };
+    // Private members for RichEdit routines
+    HANDLE m_RichEditThread = INVALID_HANDLE_VALUE;
+    std::deque<RichEditOutputData> m_RichEditQueue;
+
+    // Private thread for RichEdit routine
+    static DWORD CALLBACK RichEditThreadProc(LPVOID Parameter);
 
     // Private static callback functions
     static DWORD CALLBACK EditStreamCallback(DWORD_PTR dwCookie, LPBYTE pbBuff, LONG cb, LONG* pcb);

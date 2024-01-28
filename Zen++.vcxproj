@@ -165,6 +165,8 @@
     <ClInclude Include="HttpSessionBase.h" />
     <ClInclude Include="IoCompletionPortBase.h" />
     <ClInclude Include="MainDialog.h" />
+    <ClInclude Include="MkFile.h" />
+    <ClInclude Include="ParseBuffer.h" />
     <ClInclude Include="PopupMenu.h" />
     <ClInclude Include="Precomp.h" />
     <ClInclude Include="Program.h" />
@@ -188,6 +190,8 @@
     <ClCompile Include="HttpSessionBase.cpp" />
     <ClCompile Include="IoCompletionPortBase.cpp" />
     <ClCompile Include="MainDialog.cpp" />
+    <ClCompile Include="MkFile.cpp" />
+    <ClCompile Include="ParseBuffer.cpp" />
     <ClCompile Include="PopupMenu.cpp" />
     <ClCompile Include="Precomp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

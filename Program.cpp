@@ -40,6 +40,11 @@ AboutDialog& Program::GetAboutDialog(VOID) CONST
 	return *m_AboutDialog;
 }
 
+CronusZen& Program::GetCronusZen(VOID) CONST
+{
+	return *m_CronusZen;
+}
+
 FirmwareDialog& Program::GetFirmwareDialog(VOID) CONST
 {
 	return *m_FirmwareDialog;
@@ -63,49 +68,45 @@ BOOLEAN Program::InitializeProgram(VOID)
 		if (!(m_RichEdit = LoadLibrary(L"RichEd20.dll")))
 			throw std::wstring(L"An error occured while loading the RichEdit library.\r\n\r\nPlease restart the application or contact support for assistance.");
 
-		// Create the main dialog
+		// Initialize objects
+		m_CronusZen = std::make_unique<CronusZen>();
 		m_MainDialog = std::make_unique<MainDialog>();
 
-		// Check for elevated privileges
-		CheckAdministrator();
+		// Delete update and download files
+		DeleteFile(L"Zen.exe");
 		DeleteFile(L"ZppUpdater.exe");
 
 		// Create dialog
 		m_MainDialog->Create(DIALOG_MAIN);
 		m_MainDialog->RichEditInitialize(RICHEDIT_MAIN_OUTPUT, L"Cascadia Code", 180, 1160);
 		m_MainDialog->DisplayStartupInfo();
+
+		// Display message to RichEdit control if the app was just updated
 		if (m_Updated) {
 			m_MainDialog->PrintTimestamp();
 			m_MainDialog->PrintText(LIGHTBLUE, L"Successfully updated to latest version %u.%u.%u.\r\n", VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
 		}
+
+		// Check for elevated privileges
+		CheckAdministrator();
+
+		// Display administrative privileges status
 		m_MainDialog->DisplayAdministratorStatus();
 
 		// Create version check object
+#ifndef _DEBUG
 		m_VersionCheck = std::make_unique<VersionCheck>(L"pastebin.com", L"/raw/tU0aHMq0");
-
+#else
+		m_VersionCheck = std::make_unique<VersionCheck>(L"pastebin.com", L"/raw/tU0aHMq0");
+#endif
 		// Validate VersionCheck object was created
 		if (!m_VersionCheck.get())
-			EnableMenuItem(GetMainDialog().GetMenuHandle(), MENU_HELP_ZENPPNEWS, MF_BYCOMMAND | MF_DISABLED);
+			EnableMenuItem(GetMainDialog().GetMenuHandle(), MENU_HELP_NEWS, MF_BYCOMMAND | MF_DISABLED);
 
-		CronusZen* Cronus = new CronusZen();
+		// Perform version check based on build version
+		//m_VersionCheck->CheckUpdatesAndNews();
 
-		Cronus->ConnectToDevice();
-		
-		/*DeviceLocatorBase* Base = new DeviceLocatorBase(L"Cronus ZEN", L"USB");
-		DfuController* WinUsb = new DfuController();
-
-		if (Base->FindDevice()) {
-			if (WinUsb->OpenConnection(Base->GetDevicePath())) {
-				App->GetMainDialog().PrintTimestamp();
-				App->GetMainDialog().PrintText(GREEN, L"Opened USB connection.\r\n");
-				WinUsb->CloseConnection();
-			}
-		}*/
-
-#ifndef _DEBUG
-		// Perform version check
-		m_VersionCheck->CheckUpdatesAndNews();
-#endif
+		m_CronusZen->ConnectToDevice();
 
 	}
 	catch (CONST std::wstring& CustomMessage)
@@ -124,6 +125,29 @@ BOOLEAN Program::InitializeProgram(VOID)
 BOOLEAN Program::IsAdministrator(VOID) CONST
 {
 	return m_Administrator;
+}
+
+BOOL Program::IsQuitting(VOID) CONST
+{
+	return m_Quitting;
+}
+
+CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
+{
+	std::wstring_convert<std::codecvt_utf8<WCHAR>> Converter;
+	return Converter.from_bytes(String);
+}
+
+CONST std::wstring Program::BytesToUnicode(CONST PBYTE& Bytes, CONST UINT BytesSize)
+{
+	std::wstring_convert<std::codecvt_utf16<wchar_t, 0x10FFFF, std::little_endian>> Converter;
+	return Converter.from_bytes(reinterpret_cast<const char*>(Bytes), reinterpret_cast<const char*>(Bytes + BytesSize));
+}
+
+CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
+{
+	std::wstring_convert<std::codecvt_utf8<WCHAR>> Converter;
+	return Converter.to_bytes(String);
 }
 
 HINSTANCE Program::GetInstance(VOID) CONST
@@ -160,6 +184,12 @@ INT Program::RunMessageLoop(VOID)
 
 	return static_cast<INT>(Message.wParam);
 
+}
+
+VOID Program::QuitProgram(VOID)
+{
+	m_Quitting = TRUE;
+	PostQuitMessage(0);
 }
 
 VOID Program::CreateFirmwareDialog(CONST FirmwareManager::FirmwareModificationPurpose Purpose)
@@ -207,26 +237,38 @@ VOID Program::DisplayError(CONST std::wstring& AdditionalMessage)
 	LPVOID ErrorBuffer = nullptr;
 	DWORD ErrorCode = GetLastError();
 	DWORD ErrorBufferSize = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, nullptr, ErrorCode, 0, (LPWSTR)&ErrorBuffer, 0, nullptr);
-	std::wstring ErrorMessage(AdditionalMessage);
+	BOOL HasSystemMessage = ((ErrorCode != ERROR_SUCCESS) && (ErrorCode != ERROR_IO_PENDING)) && ErrorBuffer;
+	std::wstring ErrorMessage = AdditionalMessage;
+	std::wstring SystemError;
+
+	// Check if there is a system error message
+	if (HasSystemMessage)
+		SystemError = L"System: " + std::wstring((LPCWSTR)ErrorBuffer);
 
 	// Determine whether to provide a message box or output to the main window
 	if (m_MainDialog == nullptr) {
 		// Append system error (if applicable)
-		if ((ErrorCode != ERROR_SUCCESS) && ErrorBuffer)
-			ErrorMessage += +L"\r\n\r\nSystem: " + std::wstring((LPCWSTR)ErrorBuffer);
+		if (HasSystemMessage) {
+			if (AdditionalMessage.size()) {
+				ErrorMessage += L"\r\n\r\n";
+			}
+			ErrorMessage += SystemError;
+		}
 
 		// Alert error
 		MessageBox(NULL, ErrorMessage.c_str(), L"Zen++ Error", MB_ICONERROR | MB_OK);
 	}
 	else {
 		// Display error
-		m_MainDialog->PrintTimestamp();
-		m_MainDialog->PrintText(RED, L"Error: %ws\r\n", ErrorMessage.c_str());
+		if (ErrorMessage.size()) {
+			m_MainDialog->PrintTimestamp();
+			m_MainDialog->PrintText(RED, L"Error: %ws\r\n", ErrorMessage.c_str());
+		}
 
 		// Display system error (if applicable)
-		if ((ErrorCode != ERROR_SUCCESS) && ErrorBuffer) {
+		if (HasSystemMessage) {
 			m_MainDialog->PrintTimestamp();
-			m_MainDialog->PrintText(RED, L"System: %ws", std::wstring((LPCWSTR)ErrorBuffer).c_str());
+			m_MainDialog->PrintText(RED, L"%ws", SystemError.c_str());
 		}
 	}
 

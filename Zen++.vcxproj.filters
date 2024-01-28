@@ -114,6 +114,12 @@
     <ClInclude Include="StoreBuffer.h">
       <Filter>Header Files\Utilities</Filter>
     </ClInclude>
+    <ClInclude Include="ParseBuffer.h">
+      <Filter>Header Files\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="MkFile.h">
+      <Filter>Header Files\Clients</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Precomp.cpp">
@@ -178,6 +184,12 @@
     </ClCompile>
     <ClCompile Include="StoreBuffer.cpp">
       <Filter>Source Files\Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="ParseBuffer.cpp">
+      <Filter>Source Files\Utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="MkFile.cpp">
+      <Filter>Source Files\Clients</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
