@@ -5,7 +5,6 @@
 #pragma once
 #endif
 
-class CommandBase;
 class MkFile;
 
 class CronusZen : public HidDeviceBase
@@ -408,13 +407,6 @@ private:
 	static DWORD WINAPI CronusWorkerThreadProc(LPVOID Parameter);
 };
 
-class CommandBase : public StoreBuffer
-{
-public:
-	explicit CommandBase(_In_ CONST CronusZen::PacketID Command);
-	~CommandBase() = default;
-};
-
 class ChangeSlotACommand : public CommandBase
 {
 public:
@@ -545,4 +537,5 @@ public:
 
 	}
 };
+
 #endif

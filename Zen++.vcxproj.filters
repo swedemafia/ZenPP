@@ -120,6 +120,9 @@
     <ClInclude Include="MkFile.h">
       <Filter>Header Files\Clients</Filter>
     </ClInclude>
+    <ClInclude Include="CommandBase.h">
+      <Filter>Header Files\Base Classes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Precomp.cpp">
@@ -190,6 +193,9 @@
     </ClCompile>
     <ClCompile Include="MkFile.cpp">
       <Filter>Source Files\Clients</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandBase.cpp">
+      <Filter>Source Files\Base Classes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

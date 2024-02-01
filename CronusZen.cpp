@@ -1,11 +1,5 @@
 #include "Precomp.h"
 
-CommandBase::CommandBase(CONST CronusZen::PacketID Command)
-{
-	InsertByte(0);
-	InsertByte(Command);
-}
-
 CONST CronusZen::ConnectionState& CronusZen::GetConnectionState(VOID) CONST
 {
 	return m_ConnectionState;

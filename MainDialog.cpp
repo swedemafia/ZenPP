@@ -45,7 +45,7 @@ VOID MainDialog::UncheckAllMenuItems(CONST HMENU Menu)
 	INT MenuItemCount = GetMenuItemCount(Menu);
 
 	// Iterate through each menu item
-	for (unsigned i = 0; i < MenuItemCount; ++i) {
+	for (INT i = 0; i < MenuItemCount; ++i) {
 		// Retrieve menu item state by position
 		UINT MenuState = GetMenuState(Menu, i, MF_BYPOSITION);
 

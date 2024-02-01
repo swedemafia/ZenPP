@@ -43,6 +43,7 @@
 #include "StoreBuffer.h"
 
 // Base classes:
+#include "CommandBase.h"
 #include "DeviceLocatorBase.h"
 #include "DialogBase.h"
 #include "HidDeviceBase.h"
