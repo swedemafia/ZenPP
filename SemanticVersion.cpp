@@ -40,6 +40,7 @@ VOID SemanticVersion::ProcessVersionString(_In_ CONST std::string VersionString)
 
 	try
 	{
+		// Check for a regex match of the version string against the desired pattern
 		if (std::regex_match(VersionString, Matches, *Pattern) && Matches[1].matched && Matches[2].matched && Matches[3].matched) {
 			// Set version information
 			m_Major = std::stoi(Matches[1]);

@@ -26,7 +26,9 @@ VOID MkFile::HandleCreateDirectoryError(VOID)
 	// Retrieve error code from the failed operation
 	DWORD ErrorCode = GetLastError();
 
-	// Handle various errors based on the error code
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();	// Handle various errors based on the error code
+
 	switch (ErrorCode) {
 	case ERROR_ALREADY_EXISTS:
 		// Folder already exists, no action needed
@@ -37,11 +39,11 @@ VOID MkFile::HandleCreateDirectoryError(VOID)
 		// - Suggest moving the application out of restricted locations (i.e. Downloads folder)
 		// - Provide support information
 		// - Throw an empty string to provide the system error message
-		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(ORANGE, L"Unable to create the MkFile and its folder in this location.  The application does not have the necessary permissions to perform this operation in this location.\r\n");
-		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(ORANGE, L"Please make sure you have removed this application from your Downloads folder and placed it somewhere else such as its own folder on your Desktop.\r\n");
-		App->GetMainDialog().DisplaySupportInfo();
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"Unable to create the MkFile and its folder in this location.  The application does not have the necessary permissions to perform this operation in this location.\r\n");
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"Please make sure you have removed this application from your Downloads folder and placed it somewhere else such as its own folder on your Desktop.\r\n");
+		MainDialog.DisplaySupportInfo();
 		throw std::wstring(L"");
 		break;
 	case ERROR_ELEVATION_REQUIRED:
@@ -50,10 +52,10 @@ VOID MkFile::HandleCreateDirectoryError(VOID)
 		// - Display the administrator status notification
 		// - Provide support information
 		// - Throw an empty string to provide the system error message
-		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(ORANGE, L"Creating the MkFile and its folder in this location requires administrative privileges.  Please run this application as an administrator and try again.\r\n");
-		App->GetMainDialog().DisplayAdministratorStatus();
-		App->GetMainDialog().DisplaySupportInfo();
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"Creating the MkFile and its folder in this location requires administrative privileges.  Please run this application as an administrator and try again.\r\n");
+		MainDialog.DisplayAdministratorStatus();
+		MainDialog.DisplaySupportInfo();
 		throw std::wstring(L"");
 		break;
 	default:
@@ -65,9 +67,11 @@ VOID MkFile::HandleCreateDirectoryError(VOID)
 // Method for processing the MkFile data while creating the directory and saving the extracted file data
 VOID MkFile::SetMkFileData(CONST PUCHAR FileData, CONST std::size_t FileSize)
 {
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();	// Handle various errors based on the error code
+
 	// Attempt to process MkFile data and handle any potential errors
-	try
-	{
+	try {
 		// Create a ParseBuffer object to handle the parsing of the provided file data
 		m_ParseBuffer = std::make_unique<ParseBuffer>(FileData, FileSize);
 
@@ -80,8 +84,8 @@ VOID MkFile::SetMkFileData(CONST PUCHAR FileData, CONST std::size_t FileSize)
 		// If the MkFile doesn't exist, create and save the data
 		if (!m_File->Exists()) {
 			// Notify the user about the attempted save
-			App->GetMainDialog().PrintTimestamp();
-			App->GetMainDialog().PrintText(GRAY, L"Attempting to save mouse and keyboard settings...\r\n");
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GRAY, L"Attempting to save mouse and keyboard settings...\r\n");
 
 			// Create the "MkFile" directory and handle any access/elevation required errors
 			if (!CreateDirectory(L"MkFile", NULL))
@@ -96,16 +100,15 @@ VOID MkFile::SetMkFileData(CONST PUCHAR FileData, CONST std::size_t FileSize)
 				throw std::wstring(L"An error occured while writing to the MkFile.");
 
 			// Notify the user about a successful save
-			App->GetMainDialog().PrintTimestamp();
-			App->GetMainDialog().PrintText(GREEN, L"Successfully extracted and saved mouse and keyboard settings to %ws.zmk!\r\n", GetName().c_str());
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GREEN, L"Successfully extracted and saved mouse and keyboard settings to %ws.zmk!\r\n", GetName().c_str());
 		}
 
-	}
-	catch (CONST std::bad_alloc&) {
+	} catch (CONST std::bad_alloc&) {
 		// Memory allocation errors
 		App->DisplayError(L"Insufficient memory is available to handle the mouse and keyboard settings file.");
-	}
-	catch (CONST std::wstring& CustomMessage) {
+
+	} catch (CONST std::wstring& CustomMessage) {
 		// Handle other errors
 		App->DisplayError(CustomMessage);
 	}

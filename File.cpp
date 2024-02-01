@@ -65,7 +65,7 @@ CONST BOOL File::Open(CONST std::wstring& FileName, CONST DWORD DesiredAccess, C
 	try
 	{
 		if ((m_Handle = CreateFile(FileName.c_str(), DesiredAccess, ShareMode, NULL, CreationDisposition, Flags, NULL)) == INVALID_HANDLE_VALUE)
-			throw std::wstring(L"An error occured opening " + FileName + L".");
+			return FALSE;
 
 		if (QueryFileSize && !GetFileSizeEx(m_Handle, &m_FileSize))
 			throw std::wstring(L"An error occured while getting the file size.");

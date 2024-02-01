@@ -9,11 +9,13 @@ VOID HttpSessionBase::DownloadFile(VOID)
 
 DWORD HttpSessionBase::HttpSessionThreadProc(LPVOID Parameter)
 {
+	// Cast thread parameter to a usable data type
 	HttpSessionBase* Base = reinterpret_cast<HttpSessionBase*>(Parameter);
+	
+	// Initialize HTTP session, connection and request state variables
 	HINTERNET Session = NULL, Connection = NULL, Request = NULL;
 
-	try
-	{
+	try {
 		// Open HTTP session
 		if (!(Session = WinHttpOpen(L"Zen++ HTTP Client", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)))
 			throw std::wstring(L"An error occured  a HTTP session.");
@@ -71,9 +73,7 @@ DWORD HttpSessionBase::HttpSessionThreadProc(LPVOID Parameter)
 		// Send to callback function
 		Base->HttpSessionDataCallback(*Segments);
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
 	}
 

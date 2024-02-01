@@ -48,8 +48,7 @@ std::wstring WinUsbBase::WinUsbGetStringDescriptor(CONST UCHAR Index)
 
 BOOL WinUsbBase::WinUsbOpenConnection(CONST std::wstring& DevicePath)
 {
-	try
-	{
+	try {
 		// Attempt to open device handle
 		m_Device = std::make_unique<File>(DevicePath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, FALSE);
 
@@ -60,14 +59,10 @@ BOOL WinUsbBase::WinUsbOpenConnection(CONST std::wstring& DevicePath)
 		if (!WinUsb_Initialize(m_Device->GetHandle(), &m_InterfaceHandle))
 			throw std::wstring(L"An error occured while initializing the WinUsb interface.");
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
 		return FALSE;
-	}
-	catch (CONST std::bad_alloc&)
-	{
+	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"An error occured while creating the File object.");
 		return FALSE;
 	}
@@ -75,23 +70,23 @@ BOOL WinUsbBase::WinUsbOpenConnection(CONST std::wstring& DevicePath)
 	return TRUE;
 }
 
+// Method to obtain the USB device descriptor
 USB_DEVICE_DESCRIPTOR WinUsbBase::WinUsbGetDeviceDescriptor(VOID)
 {
+	// Initialize variables used to retrieve the USB device descriptor including the length of data transferred
 	USB_DEVICE_DESCRIPTOR DeviceDescriptor = { NULL };
 	ULONG LengthTransferred = 0;
 
-	try
-	{
+	try {
 		// Query device descriptor
 		if (!WinUsb_GetDescriptor(m_InterfaceHandle, USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, (PUCHAR)&DeviceDescriptor, sizeof(DeviceDescriptor), &LengthTransferred))
 			throw std::wstring(L"An error occured while querying the USB device descriptor.");
 
+		// Validate the size of the data transferred to ensure it matches the size of the target descriptor
 		if (LengthTransferred != sizeof(DeviceDescriptor))
 			throw std::wstring(L"An error occured while querying the USB device descriptor; incomplete data was returned.");
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
 	}
 

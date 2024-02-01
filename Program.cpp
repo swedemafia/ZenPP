@@ -132,18 +132,21 @@ BOOL Program::IsQuitting(VOID) CONST
 	return m_Quitting;
 }
 
+// Method for converting an ANSI string to a Unicode string
 CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
 {
 	std::wstring_convert<std::codecvt_utf8<WCHAR>> Converter;
 	return Converter.from_bytes(String);
 }
 
+// Method for converting raw bytes to a Unicode string
 CONST std::wstring Program::BytesToUnicode(CONST PBYTE& Bytes, CONST UINT BytesSize)
 {
 	std::wstring_convert<std::codecvt_utf16<wchar_t, 0x10FFFF, std::little_endian>> Converter;
 	return Converter.from_bytes(reinterpret_cast<const char*>(Bytes), reinterpret_cast<const char*>(Bytes + BytesSize));
 }
 
+// Method for converting a Unicode string to an ANSI string
 CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
 {
 	std::wstring_convert<std::codecvt_utf8<WCHAR>> Converter;

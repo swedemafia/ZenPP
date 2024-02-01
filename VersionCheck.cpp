@@ -8,9 +8,12 @@ VersionCheck::VersionCheck(CONST std::wstring& Domain, CONST std::wstring& PathT
 
 VOID VersionCheck::CheckUpdatesAndNews(VOID)
 {
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
 	// Notify user of status
-	App->GetMainDialog().PrintTimestamp();
-	App->GetMainDialog().PrintText(GRAY, L"Checking for news and updates...\r\n");
+	MainDialog.PrintTimestamp();
+	MainDialog.PrintText(GRAY, L"Checking for news and updates...\r\n");
 
 	// Query the updates and news file
 	DownloadFile();
@@ -18,9 +21,12 @@ VOID VersionCheck::CheckUpdatesAndNews(VOID)
 
 VOID VersionCheck::DisplayNews(VOID) CONST
 {
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
 	for (const auto NewsItem : m_News) {
-		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(LIGHTGREEN, L"%ws\r\n", NewsItem.c_str());
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(LIGHTGREEN, L"%ws\r\n", NewsItem.c_str());
 	}
 }
 
@@ -34,12 +40,16 @@ VOID VersionCheck::ProcessAlertCommand(CONST UINT MessageBoxType, CONST std::str
 
 VOID VersionCheck::ProcessNewsCommand(CONST COLORREF Color, CONST std::string_view NewsString)
 {
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// Convert ANSI string to Unicode
 	std::wstring NewsText = std::wstring(NewsString.begin(), NewsString.end());
 	m_News.push_back(NewsText);
 
 	// Display news to output window
-	App->GetMainDialog().PrintTimestamp();
-	App->GetMainDialog().PrintText(Color, L"%ws\r\n", NewsText.c_str());
+	MainDialog.PrintTimestamp();
+	MainDialog.PrintText(Color, L"%ws\r\n", NewsText.c_str());
 }
 
 VOID VersionCheck::ProcessUpdateAddress(CONST std::string& UpdateAddress)
@@ -76,23 +86,26 @@ VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 
 		// Notify user
 		if (MessageBox(Main->GetHwnd(), L"An update is available for this application.\r\n\r\nPress OK to launch the updater.", L"Zen++", MB_ICONINFORMATION | MB_OK) == IDOK) {
-			try
-			{
+			try {
+				// Initialize variables used for the extraction and execution of the Zen++ Updater
 				DWORD BytesWritten = 0;
 				PROCESS_INFORMATION ProcessInfo = { NULL };
 				STARTUPINFOA StartupInfo = { sizeof(STARTUPINFOA) };
 				m_VersionUpdater = std::make_unique<ResourceFile>(App->GetInstance(), FILE_ZPPUPDATER);
 				std::unique_ptr<File> UpdateFile = std::make_unique<File>(L"ZppUpdater.exe", GENERIC_WRITE, FILE_SHARE_WRITE, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, TRUE);
 
+				// Attempt to open the target file
 				if (!UpdateFile->Open())
 					throw std::wstring(L"An error occured while executing ZppUpdater.");
 
+				// Attempt to write the file data for the Zen++ Updater
 				if (!UpdateFile->Write(m_VersionUpdater->GetFileData(), m_VersionUpdater->GetFileSize(), NULL, NULL))
 					throw std::wstring(L"An error occured while creating ZppUpdater.");
 
+				// Close the file after writing to it
 				UpdateFile->Close();
 
-				// Launch updater
+				// Attempt to execute the Zen++ updater and provide command-line parameters
 				if (!CreateProcessA("ZppUpdater.exe", &m_CommandLine[0], NULL, NULL, TRUE, 0, NULL, NULL, &StartupInfo, &ProcessInfo)) {
 					throw std::wstring(L"An error occured while launching ZppUpdater.");
 				} 
@@ -101,8 +114,7 @@ VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 			}
 			catch (CONST std::wstring& CustomMessage) {
 				App->DisplayError(CustomMessage);
-			}
-			catch (CONST std::bad_alloc&) {
+			} catch (CONST std::bad_alloc&) {
 				App->DisplayError(L"Unable to create the ResourceFile object; insufficient memory is available to complete the required operation.");
 			}
 		}
@@ -111,8 +123,9 @@ VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 
 VOID VersionCheck::HttpSessionDataCallback(CONST std::deque<std::string> ResponseData)
 {
+	// Iterate through each item of the HTTP response data and process it based on the command
 	for (const auto& Data : ResponseData) {
-		
+		// Initialize a variable to hold the current line of data being processed
 		std::string Line(Data);
 
 		// Process line
@@ -125,23 +138,17 @@ VOID VersionCheck::HttpSessionDataCallback(CONST std::deque<std::string> Respons
 			// Process commands
 			if (!Command.compare("update_notes")) {
 				m_UpdateNotes.push_back(std::wstring(Text.begin(), Text.end()));
-			}
-			else if (!Command.compare("address")) {
+			} else if (!Command.compare("address")) {
 				ProcessUpdateAddress(Text);
-			}
-			else if (!Command.compare("version")) {
+			} else if (!Command.compare("version")) {
 				ProcessVersionCommand(Text);
-			}
-			else if (!Command.compare("news")) {
+			} else if (!Command.compare("news")) {
 				ProcessNewsCommand(LIGHTGREEN, Text);
-			}
-			else if (!Command.compare("news2")) {
+			} else if (!Command.compare("news2")) {
 				ProcessNewsCommand(YELLOW, Text);
-			}
-			else if (!Command.compare("notice")) {
+			} else if (!Command.compare("notice")) {
 				ProcessAlertCommand(MB_ICONINFORMATION, Text.data());
-			}
-			else if (!Command.compare("warning")) {
+			} else if (!Command.compare("warning")) {
 				ProcessAlertCommand(MB_ICONWARNING, Text.data());
 			}
 		}

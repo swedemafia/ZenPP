@@ -20,8 +20,7 @@ BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 	PHIDP_PREPARSED_DATA PreparsedData = NULL;
 	HIDP_CAPS Capabilities = { NULL };
 
-	try
-	{
+	try {
 		// Retrieve preparsed data from the HID device
 		if (!HidD_GetPreparsedData(m_Device->GetHandle(), &PreparsedData))
 			throw std::wstring(L"An error occured while querying HID device preparsed collection data.");
@@ -41,12 +40,10 @@ BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 		HidD_FreePreparsedData(PreparsedData);
 
 		return TRUE; // Signal success
-	}
-	catch (CONST std::bad_alloc&) {
+	} catch (CONST std::bad_alloc&) {
 		// Handle memory allocation error
 		App->DisplayError(L"Insufficient memory available to complete the required operation.");
-	}
-	catch (CONST std::wstring& CustomMessage) {
+	} catch (CONST std::wstring& CustomMessage) {
 		// Handle other errors with custom messages
 		App->DisplayError(CustomMessage);
 	}
@@ -78,6 +75,11 @@ VOID HidDeviceBase::DisconnectFromDevice(VOID)
 
 	// Suspend thread
 	SuspendThread(GetIocpThreadHandle());
+
+	if (App->GetCronusZen().GetConnectionState() == CronusZen::Connected) {
+		// Update device state
+		App->GetCronusZen().SetConnectionState(CronusZen::Disconnected);
+	}
 }
 
 // Method for scanning and calling to open a connection to the device
@@ -91,8 +93,12 @@ VOID HidDeviceBase::ConnectToDevice(VOID)
 		App->GetMainDialog().PrintTimestamp();
 		App->GetMainDialog().PrintText(GRAY, L"Attempting to connect to your Cronus Zen...\r\n");
 
-		try
-		{
+		if (App->GetCronusZen().GetConnectionState() == CronusZen::Disconnected) {
+			// Update device state
+			App->GetCronusZen().SetConnectionState(CronusZen::Connecting);
+		}
+
+		try {
 			// Create new device file handle
 			m_Device = std::make_unique<File>(GetDevicePath(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, FALSE);
 
@@ -111,15 +117,15 @@ VOID HidDeviceBase::ConnectToDevice(VOID)
 			// Post completion status to IOCP to signal a successful connection
 			if (!PostQueuedCompletionStatus(GetIocpHandle(), 0, IocpCompletionKey::Connect, GetOverlappedConnect()))
 				throw std::wstring(L"An error occured while posting the connection completion status to the I/O completion port.");
-		}
-		catch (CONST std::wstring& CustomMessage) {
+
+		} catch (CONST std::wstring& CustomMessage) {
 			// Display the custom error message to the user
 			App->DisplayError(CustomMessage);
 
 			// Disconnect from the device
 			DisconnectFromDevice();
-		}
-		catch (CONST std::bad_alloc&) {
+
+		} catch (CONST std::bad_alloc&) {
 			// Display a notice regarding a bad allocation
 			App->DisplayError(L"Insufficient memory available to complete the required operation.");
 		}
@@ -142,7 +148,7 @@ VOID HidDeviceBase::AsynchronousRead(VOID)
 	}
 }
 
-VOID HidDeviceBase::AsynchronousWrite(_In_ CONST PUCHAR Data)
+VOID HidDeviceBase::AsynchronousWrite(CONST PUCHAR Data)
 {
 	// Reset the overlapped structure for the write operation
 	ZeroMemory(GetOverlappedWrite(), sizeof(OVERLAPPED));
@@ -157,5 +163,6 @@ VOID HidDeviceBase::AsynchronousWrite(_In_ CONST PUCHAR Data)
 		}
 	}
 
+	// Free memory that was previously allocated prior to being passed to this method
 	delete[] Data;
 }

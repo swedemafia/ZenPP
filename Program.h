@@ -68,6 +68,6 @@ private:
 	VOID CheckAdministrator(VOID);
 };
 
-extern Program* App;
+extern std::unique_ptr<Program> App;
 
 #endif

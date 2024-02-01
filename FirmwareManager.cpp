@@ -68,33 +68,28 @@ BOOL FirmwareManager::UpdateCompleted(VOID) CONST
 
 DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 {
+	// Cast the thread parameter to a usable data type
 	FirmwareManager* Manager = reinterpret_cast<FirmwareManager*>(Parameter);
 
-	try
-	{
-		DfuStatus Status;
+	try {
 		WORD BytesProcessed = 0;
 		UCHAR LockBlock[0x70] = { 0 };
 		UCHAR Payload[0x420] = { 0 };
 
 		// Step 1: clear error and abort
-		Status = Manager->DfuClearErrorAndAbort(DfuController::Locked);
-		if (Status.State != DfuController::Locked)
+		if (Manager->DfuClearErrorAndAbort(DfuController::Locked).State != DfuController::Locked)
 			throw std::wstring(L"An error occured while erasing the firmware, unexpected state (ClearErrorAndAbort).");
 
 		// Get status and wait
-		Status = Manager->GetStatusAndWait();
-		if (Status.State != DfuController::Locked)
+		if (Manager->GetStatusAndWait().State != DfuController::Locked)
 			throw std::wstring(L"An error occured while checking status; the device is not locked.");
-
 
 		// Step 2: prepare unlock
 		CopyMemory(&LockBlock, Manager->m_ResourceFile->GetFileData(), 0x70);
 		Manager->DfuUnlock(LockBlock);
 
 		// Get status and wait
-		Status = Manager->GetStatusAndWait();
-		if (Status.State != DfuController::Idle)
+		if (Manager->GetStatusAndWait().State != DfuController::Idle)
 			throw std::wstring(L"An error occured while unlocking the device firmware.");
 
 		// Update Progress bar
@@ -105,9 +100,8 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 		CopyMemory(&Payload, Manager->m_ResourceFile->GetFileData() + BytesProcessed, 0x420);
 		Manager->DfuDownload(0, Payload, 0x420);
 		
-		// Get status
-		Status = Manager->GetStatusAndWait();
-		if (Status.State != DfuController::DownloadIdle)
+		// Get status and wait
+		if (Manager->GetStatusAndWait().State != DfuController::DownloadIdle)
 			throw std::wstring(L"An error occured while flashing the device.");
 
 		// Update Progress bar
@@ -121,19 +115,21 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 		if(Manager->m_Modification == FirmwareModificationPurpose::EraseFirmware)
 			MessageBox(App->GetFirmwareDialog().GetHwnd(), Manager->m_SuccessMessage[FirmwareModificationPurpose::EraseFirmware].c_str(), L"Zen++ Firmware Manager", MB_ICONINFORMATION | MB_OK);
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		MessageBox(App->GetFirmwareDialog().GetHwnd(), CustomMessage.c_str(), L"Zen++ Firmware Manager", MB_ICONERROR | MB_OK);
 	}
 
+	// Update the edit control containing the device descriptors
 	Manager->UpdateDescriptors();
 
+	// Determine the next steps of this process
+	// - Spawn an install firmware thread, if necessary
+	// - OR -
+	// - Signal the end of the firmware modification
 	if (Manager->m_Modification == FirmwareModificationPurpose::InstallCompatibleFirmware) {
 		Manager->LoadFirmware(TRUE);
 		Manager->SpawnInstallThread();
-	}
-	else {
+	} else {
 		Manager->m_Modifying = FALSE;
 	}
 
@@ -142,11 +138,11 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 
 DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 {
+	// Cast the thread parameter to a usable data type
 	FirmwareManager* Manager = reinterpret_cast<FirmwareManager*>(Parameter);
 
-	try
-	{
-		DfuStatus Status;
+	try {
+		// Initialize variables required during the firmware download process
 		DWORD BytesProcessed = 0;
 		DWORD BytesTotal = 0;
 		PBYTE FileData = 0;
@@ -156,18 +152,17 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 		USHORT Block = 0;
 
 		// Step 1: clear error and abort, if necessary
-		Status = Manager->DfuClearErrorAndAbort(DfuController::Locked);
-		if (Status.State != DfuController::Locked)
+		if (Manager->DfuClearErrorAndAbort(DfuController::Locked).State != DfuController::Locked)
 			throw std::wstring(L"An error occured while erasing the firmware, unexpected state (ClearErrorAndAbort).");
 
 		// Get status and wait
-		Status = Manager->GetStatusAndWait();
-
-		// Check result
-		if (Status.State != DfuController::Locked)
+		if (Manager->GetStatusAndWait().State != DfuController::Locked)
 			throw std::wstring(L"An error occured while checking status; the device is not locked.");
 
 		// Determine the source of the firmware file data
+		// - Load the file data for a custom file
+		// - OR -
+		// - Load the file data from an embedded resource
 		if (Manager->m_Modification == FirmwareModificationPurpose::InstallCustomFirmware) {
 			BytesTotal = Manager->m_CustomFile->GetFileSize() & 0xffffffff;
 			Manager->m_CustomFile->GetFileData(CustomFileData);
@@ -183,10 +178,7 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 		Manager->DfuUnlock(LockBlock);
 
 		// Get status and wait
-		Status = Manager->GetStatusAndWait();
-
-		// Check result
-		if (Status.State != DfuController::Idle)
+		if (Manager->GetStatusAndWait().State != DfuController::Idle)
 			throw std::wstring(L"An error occured while unlocking the firmware on the device.");
 
 		// Update Progress bar
@@ -200,10 +192,7 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 			Manager->DfuDownload(Block++, Payload, 0x420);
 
 			// Get status and wait
-			Status = Manager->GetStatusAndWait();
-
-			// Check result
-			if (Status.State != DfuController::DownloadIdle)
+			if (Manager->GetStatusAndWait().State != DfuController::DownloadIdle)
 				throw std::wstring(L"An error occured while flashing firmware to the device.");
 
 			// Update Progress bar
@@ -213,10 +202,9 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 
 		// Step 4: lock firmware
 		Manager->DfuDownload(0, nullptr, 0);
-		Status = Manager->GetStatusAndWait();
 
-		// Check result
-		if (Status.State != DfuController::Locked)
+		// Get status and wait
+		if (Manager->GetStatusAndWait().State != DfuController::Locked)
 			throw std::wstring(L"An error occured while locking the firmware.");
 
 		// Step 5: update descriptors
@@ -225,17 +213,16 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 
 		// Step 6: load firmware
 		Manager->DfuEnterUserApplication();
-		App->GetFirmwareDialog().UpdateProgressBar(BytesTotal, BytesTotal);
 
 		// Notify user of success
+		App->GetFirmwareDialog().UpdateProgressBar(BytesTotal, BytesTotal);
 		MessageBox(App->GetFirmwareDialog().GetHwnd(), Manager->m_SuccessMessage[Manager->m_Modification].c_str(), L"Zen++ Firmware Manager", MB_ICONINFORMATION | MB_OK);
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		MessageBox(App->GetFirmwareDialog().GetHwnd(), CustomMessage.c_str(), L"Zen++ Firmware Manager", MB_ICONERROR | MB_OK);
 	}
 	
+	// Signal the completion of the firmware modification
 	Manager->m_Modifying = FALSE;
 
 	return 0;
@@ -268,10 +255,8 @@ DfuController::DfuStatus FirmwareManager::GetStatusAndWait(VOID)
 
 VOID FirmwareManager::LoadFirmware(_In_ CONST BOOL IgnoreModificationPurpose)
 {
-	try
-	{
-		if (m_Modification == FirmwareModificationPurpose::InstallCustomFirmware)
-		{
+	try {
+		if (m_Modification == FirmwareModificationPurpose::InstallCustomFirmware) {
 			OPENFILENAME OpenFileName = { NULL };
 			std::unique_ptr<WCHAR[]> FileName(new WCHAR[MAX_PATH]{ 0 });
 
@@ -284,16 +269,15 @@ VOID FirmwareManager::LoadFirmware(_In_ CONST BOOL IgnoreModificationPurpose)
 			OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_FILEMUSTEXIST | OFN_DONTADDTORECENT | OFN_NOCHANGEDIR;
 
 			// Open the dialog and capture the file the user selects
-			if (GetOpenFileName(&OpenFileName))
-			{
+			if (GetOpenFileName(&OpenFileName)) {
+				// Allocate a File object used for reading from a custom firmware file
 				m_CustomFile = std::make_unique<File>(OpenFileName.lpstrFile, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, TRUE);
 
 				// Open the firmware file
 				if (!m_CustomFile->Open())
 					throw std::wstring(L"An error occured while opening the firmware file.");
 			}
-		}
-		else {
+		} else {
 			UINT ResourceID = FILE_FIRMWARE_LATEST;
 
 			// Check for IMP flag to be set because installing compatible firmware first requires loading the latest firmware
@@ -303,29 +287,23 @@ VOID FirmwareManager::LoadFirmware(_In_ CONST BOOL IgnoreModificationPurpose)
 			// Load our resource file
 			m_ResourceFile = std::make_unique<ResourceFile>(App->GetInstance(), ResourceID);
 		}
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
-	}
-	catch (CONST std::bad_alloc&) {
+	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Unable to read resource file; insufficient memory is available to complete the required operation.");
 	}
 }
 
 BOOL FirmwareManager::PerformModification(VOID)
 {
-	if (WinUsbOpenConnection(GetDevicePath()))
-	{
+	if (WinUsbOpenConnection(GetDevicePath())) {
 		UpdateDescriptors(); // Update descriptors
 		LoadFirmware(FALSE); // Load firmware
 
-		if ((m_ResourceFile && m_ResourceFile->GetFileSize()) || (m_CustomFile && m_CustomFile->GetFileSize()))
-		{
+		if ((m_ResourceFile && m_ResourceFile->GetFileSize()) || (m_CustomFile && m_CustomFile->GetFileSize())) {
 			m_Modifying = TRUE; // Set modifying state
 
-			switch (m_Modification)
-			{
+			switch (m_Modification) {
 			case FirmwareManager::FirmwareModificationPurpose::EraseFirmware:				return SpawnEraseThread();
 			case FirmwareManager::FirmwareModificationPurpose::InstallCompatibleFirmware:	return PrepareCompatibleFirmware();
 			case FirmwareManager::FirmwareModificationPurpose::InstallCustomFirmware:		return SpawnInstallThread();
@@ -345,8 +323,7 @@ VOID FirmwareManager::UpdateDescriptors(VOID)
 	// Prepare semantic version object information
 	std::wstring_view WideStrVersion = GetFirmwareVersion();
 
-	try
-	{
+	try {
 		// Initialize a new SemanticVersion object
 		m_SemanticVersion = std::make_unique<SemanticVersion>(App->UnicodeToAnsi(WideStrVersion.data()));
 
@@ -358,14 +335,12 @@ VOID FirmwareManager::UpdateDescriptors(VOID)
 			L"Bootloader Version: " + GetBootloaderVersion() + L"\r\n" +
 			L"Firmware Version: " + WideStrVersion.data();
 
-		// Print to Edit control
+		// Set the window caption for the device descriptor information
 		SetWindowText(App->GetFirmwareDialog().GetDescriptorEditHandle(), DescriptorText.c_str());
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
-	}
-	catch (CONST std::bad_alloc&) {
+	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Unable to create the SemanticVersion object; insufficient memory is available to complete the required operation.");
 	}
 }

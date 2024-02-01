@@ -12,7 +12,8 @@ public:
     ~DialogBase();
 
     // Public methods for dialog management
-    HWND GetHwnd(VOID) CONST;
+    CONST HWND GetHwnd(VOID) CONST;
+    CONST HWND GetRichEditHwnd(VOID) CONST;
     VOID BringToForeground(VOID) CONST;
     VOID Create(CONST UINT ResourceID);
     VOID SetTitle(CONST std::wstring& DialogTitle) CONST;

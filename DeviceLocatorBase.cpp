@@ -8,8 +8,7 @@ DeviceLocatorBase::DeviceLocatorBase(CONST std::wstring& DeviceName, CONST std::
 	if (DeviceType == L"HID") {
 		// Retrieve GUID for HID devices
 		HidD_GetHidGuid(&m_GUID);
-	}
-	else {
+	} else {
 		// Attempt to create GUID for non-HID devices
 		if (CLSIDFromString(L"{960bd7d9-a9a4-4922-9cab-169a1ce9bb58}", &m_GUID) != NOERROR) {
 			// Display error if GUID creation fails
@@ -26,8 +25,7 @@ BOOL DeviceLocatorBase::FindDevice(VOID)
 		SetupDiDestroyDeviceInfoList
 	);
 
-	try
-	{
+	try {
 		// Validate device info set
 		if (DevInfo.get() == INVALID_HANDLE_VALUE)
 			throw std::wstring(L"An error occured while querying SetupDiGetClassDevs.");
@@ -79,9 +77,7 @@ BOOL DeviceLocatorBase::FindDevice(VOID)
 			}
 		}
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
 	}
 
@@ -135,9 +131,7 @@ BOOL DeviceLocatorBase::FindDevicePath(VOID)
 			}
 		}
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
 	}
 

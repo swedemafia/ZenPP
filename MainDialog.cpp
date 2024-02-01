@@ -39,11 +39,110 @@ VOID MainDialog::DisplaySupportInfo(VOID)
 	PrintText(PURPLE, L"If you need further assistance, please refer to the Discord server (https://discord.gg/tGH7QxtPam) or contact your system administrator.\r\n");
 }
 
+// Method used to recursively uncheck all menu items within a specific menu and its submenus
+VOID MainDialog::UncheckAllMenuItems(CONST HMENU Menu)
+{
+	INT MenuItemCount = GetMenuItemCount(Menu);
+
+	// Iterate through each menu item
+	for (unsigned i = 0; i < MenuItemCount; ++i) {
+		// Retrieve menu item state by position
+		UINT MenuState = GetMenuState(Menu, i, MF_BYPOSITION);
+
+		// Check menu state
+		if (MenuState & MF_CHECKED) {
+			// Uncheck the item
+			CheckMenuItem(Menu, i, MF_BYPOSITION | MF_UNCHECKED);
+		}
+
+		// Check if a submenu exists
+		HMENU SubMenu = GetSubMenu(Menu, i);
+
+		// Recursively uncheck items in submenus
+		if (SubMenu)
+			UncheckAllMenuItems(SubMenu);
+	}
+}
+
+// Method for updating the state of the 'Device' menu items
+VOID MainDialog::UpdateDeviceMenu(_In_ CONST CronusZen::SettingsLayout& Settings)
+{
+	// Initialize constant used for checking a menu item
+	CONST UINT Checked = MF_BYCOMMAND | MF_CHECKED;
+
+	// Uncheck all menu items and start fresh
+	UncheckAllMenuItems(GetSubMenu(m_Menu, 3));
+
+	// Handle Ps4 Specialty
+	if(Settings.Ps4Specialty)
+		CheckMenuItem(m_Menu, MENU_DEVICE_PS4SPECIALTY, Checked);
+
+	// Handle Remote Play
+	if(Settings.RemotePlay)
+		CheckMenuItem(m_Menu, MENU_DEVICE_REMOTEPLAY, Checked);
+
+	// Handle emulator output protocol
+	switch (Settings.OutputMode) {
+	case CronusZen::Auto:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_AUTO, Checked);
+		break;
+	case CronusZen::NintendoSwitch:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_NINTENDOSWITCH, Checked);
+		break;
+	case CronusZen::PlayStation3:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION3, Checked);
+		break;
+	case CronusZen::PlayStation4:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION4, Checked);
+		break;
+	case CronusZen::PlayStation5:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION5, Checked);
+		break;
+	case CronusZen::Xbox360:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PCMOBILEXBOX360, Checked);
+		break;
+	case CronusZen::XboxOne:
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_XBOXONEX, Checked);
+		break;
+	}
+
+	// Handle operational mode
+	switch (Settings.OperationalMode) {
+	case CronusZen::WheelMode:
+		CheckMenuItem(m_Menu, MENU_DEVICE_OM_WHEEL, Checked);
+		break;
+	case CronusZen::GamepadMode:
+		CheckMenuItem(m_Menu, MENU_DEVICE_OM_NORMAL, Checked);
+		break;
+	case CronusZen::TournamentMode:
+		CheckMenuItem(m_Menu, MENU_DEVICE_OM_TOURNAMENT, Checked);
+		break;
+	}
+
+	// Handle remote slot change
+	switch (Settings.RemoteSlot) {
+	case CronusZen::Disabled:
+		CheckMenuItem(m_Menu, MENU_DEVICE_RSC_DISABLED, Checked);
+		break;
+	case CronusZen::PS_Share:
+		CheckMenuItem(m_Menu, MENU_DEVICE_RSC_PSSHARE, Checked);
+		break;
+	case CronusZen::PS_L3:
+		CheckMenuItem(m_Menu, MENU_DEVICE_RSC_PSL3, Checked);
+		break;
+	}
+
+	// Check for PlayStation 5 option disable
+	EnableMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION5, MF_BYCOMMAND | (App->GetCronusZen().GetFirmwareVersion().IsBeta() ? MF_DISABLED : MF_ENABLED));
+}
+
 // Method to enable/disable features based on the connection state
 VOID MainDialog::UpdateFeatureAvailability(CONST BOOL Enabled)
 {
 	// Enable/disable the "Disconnect From Device" menu item
 	EnableMenuItem(m_Menu, MENU_CONNECTION_DISCONNECT, MF_BYCOMMAND | (Enabled ? MF_ENABLED : MF_DISABLED));
+
+	// Enable/disable the entire "Device" menu
 	EnableMenuItem(m_Menu, 3, MF_BYPOSITION | (Enabled ? MF_ENABLED : MF_DISABLED));
 	
 	// Refresh/redraw/force update to menu bar
@@ -54,19 +153,25 @@ VOID MainDialog::UpdateFeatureAvailability(CONST BOOL Enabled)
 		EnableWindow(GetDlgItem(m_hWnd, i), Enabled);
 }
 
+// Method to update the edit control caption above the listbox
 VOID MainDialog::UpdateSlotsData(CONST UCHAR SlotsUsed, CONST UINT BytesUsed)
 {
+	// Initialize a string to hold the slot information
 	std::wstring SlotsString = L"";
 
+	// Handle scenarios based on slot usage and byte count
 	if (!SlotsUsed) {
 		if (BytesUsed) {
+			// No slots in use but dummy value provided for bytes
+			// - Indicates the device is not connected
 			SlotsString = L"Not connected";
-		}
-		else {
+		} else {
+			// No slots in use and no bytes used
+			// - Indicates there's no slots data
 			SlotsString = L"No slots configuration";
 		}
-	}
-	else {
+	} else {
+		// Format string with proper pluralization for slots and byte count
 		SlotsString = std::to_wstring(SlotsUsed) + L" slot";
 		if (SlotsUsed > 1) {
 			SlotsString += L"s";
@@ -74,7 +179,7 @@ VOID MainDialog::UpdateSlotsData(CONST UCHAR SlotsUsed, CONST UINT BytesUsed)
 		SlotsString += L" (" + std::to_wstring(BytesUsed) + L" bytes, " + std::to_wstring(262120 - BytesUsed) + L" free)";
 	}
 
-	// Update edit box caption
+	// UIpdate the edit box caption with the formatted slots information
 	SetWindowText(m_hWndSlotsTitle, SlotsString.c_str());
 }
 
@@ -87,18 +192,17 @@ INT_PTR MainDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONST
 {
 	MainDialog* Dialog = reinterpret_cast<MainDialog*>(GetWindowLongPtr(m_hWnd, GWLP_USERDATA));
 
-	switch (Message)
-	{
-	case WM_CLOSE:					return Dialog->OnClose();
-	case WM_COMMAND:				return Dialog->OnCommand(wParam, lParam);
-	case WM_CTLCOLORLISTBOX:		return Dialog->OnCtlColorListBox(wParam);
-	case WM_CTLCOLORSTATIC:			return Dialog->OnCtlColorStatic(wParam);
-	case WM_DESTROY:				return Dialog->OnDestroy();
-	case WM_DEVICECHANGE:			return Dialog->OnDeviceChange(wParam);
-	case WM_INITDIALOG:				return Dialog->OnInitDialog();
-	case WM_GETMINMAXINFO:			return Dialog->OnGetMinMaxInfo(lParam);
-	case WM_NOTIFY:					return Dialog->OnNotify(lParam);
-	case WM_SIZE:					return Dialog->OnSize(wParam, lParam);
+	switch (Message) {
+	case WM_CLOSE:									return Dialog->OnClose();
+	case WM_COMMAND:								return Dialog->OnCommand(wParam, lParam);
+	case WM_CTLCOLORLISTBOX:						return Dialog->OnCtlColorListBox(wParam);
+	case WM_CTLCOLORSTATIC:							return Dialog->OnCtlColorStatic(wParam);
+	case WM_DESTROY:								return Dialog->OnDestroy();
+	case WM_DEVICECHANGE:							return Dialog->OnDeviceChange(wParam);
+	case WM_INITDIALOG:								return Dialog->OnInitDialog();
+	case WM_GETMINMAXINFO:							return Dialog->OnGetMinMaxInfo(lParam);
+	case WM_NOTIFY:									return Dialog->OnNotify(lParam);
+	case WM_SIZE:									return Dialog->OnSize(wParam, lParam);
 	}
 
 	return FALSE;
@@ -112,19 +216,51 @@ INT_PTR MainDialog::OnClose(VOID)
 
 INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 {
-	switch (LOWORD(wParam))
-	{
+	switch (LOWORD(wParam)) {
+	case BUTTON_MAIN_ERASEALLSCRIPTS:				return OnCommandMainEraseAllScripts();
+	case BUTTON_MAIN_FACTORYRESET:					return OnCommandMainFactoryReset();
+	case BUTTON_MAIN_SOFTRESET:						return OnCommandMainSoftReset();
 	case MENU_CONNECTION_DISCONNECT:				return OnCommandConnectionDisconnect();
 	case MENU_CONNECTION_RECONNECT:					return OnCommandConnectionReconnect();
+	case MENU_DEVICE_CLEARBLUETOOTHDEVICES:			return OnCommandDeviceClearBluetoothDevices();
+	case MENU_DEVICE_EOP_AUTO:						return OnCommandDeviceEopAuto();
+	case MENU_DEVICE_EOP_NINTENDOSWITCH:			return OnCommandDeviceEopNintendoSwitch();
+	case MENU_DEVICE_EOP_PCMOBILEXBOX360:			return OnCommandDeviceEopPcMobileXbox360();
+	case MENU_DEVICE_EOP_PLAYSTATION3:				return OnCommandDeviceEopPlayStation3();
+	case MENU_DEVICE_EOP_PLAYSTATION4:				return OnCommandDeviceEopPlayStation4();
+	case MENU_DEVICE_EOP_PLAYSTATION5:				return OnCommandDeviceEopPlayStation5();
+	case MENU_DEVICE_EOP_XBOXONEX:					return OnCommandDeviceEopXboxOne();
+	case MENU_DEVICE_REFRESHATTACHEDDEVICES:		return OnCommandDeviceRefreshAttachedDevices();
+	case MENU_DEVICE_PS4SPECIALTY:					return OnCommandDevicePs4Specialty();
+	case MENU_DEVICE_REMOTEPLAY:					return OnCommandDeviceRemotePlay();
+	case MENU_DEVICE_TURNOFFCONTROLLER:				return OnCommandDeviceTurnOffController();
 	case MENU_FILE_EXIT:							return OnCommandFileExit();
 	case MENU_FIRMWARE_COMPATIBLE:					return OnCommandFirmwareCompatible();
 	case MENU_FIRMWARE_CUSTOM:						return OnCommandFirmwareCustom();
 	case MENU_FIRMWARE_ERASE:						return OnCommandFirmwareErase();
 	case MENU_FIRMWARE_LATEST:						return OnCommandFirmwareLatest();
 	case MENU_HELP_ABOUT:							return OnCommandHelpAbout();
-	case MENU_HELP_NEWS:						return OnCommandHelpZenPPNews();
+	case MENU_HELP_NEWS:							return OnCommandHelpZenPPNews();
 	}
 	return FALSE;
+}
+
+INT_PTR MainDialog::OnCommandMainEraseAllScripts(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::DeviceCleanup);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandMainFactoryReset(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::FactoryReset);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandMainSoftReset(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::SoftReset);
+	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandConnectionDisconnect(VOID)
@@ -137,6 +273,78 @@ INT_PTR MainDialog::OnCommandConnectionReconnect(VOID)
 {
 	App->GetCronusZen().DisconnectFromDevice();
 	App->GetCronusZen().ConnectToDevice();
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceClearBluetoothDevices(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::ClearBluetooth);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopAuto(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::Auto);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopNintendoSwitch(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::NintendoSwitch);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPcMobileXbox360(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::Xbox360);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPlayStation3(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::PlayStation3);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPlayStation4(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::PlayStation4);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPlayStation5(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::PlayStation5);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopXboxOne(VOID)
+{
+	App->GetCronusZen().SetOutputMode(CronusZen::XboxOne);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDevicePs4Specialty(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::TogglePs4Specialty);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceRemotePlay(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::ToggleRemotePlay);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceRefreshAttachedDevices(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::RefreshAttachedDevices);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceTurnOffController(VOID)
+{
+	App->GetCronusZen().CreateWorkerThread(CronusZen::TurnOffController);
 	return TRUE;
 }
 
@@ -208,8 +416,7 @@ INT_PTR MainDialog::OnDestroy(VOID)
 INT_PTR MainDialog::OnDeviceChange(CONST WPARAM wParam)
 {
 	// When a device arrives or is removed
-	if (wParam == DBT_DEVICEARRIVAL)
-	{
+	if (wParam == DBT_DEVICEARRIVAL) {
 		// Attempt to connect when a device arrives to the system
 		App->GetCronusZen().ConnectToDevice();
 	}
@@ -249,29 +456,31 @@ INT_PTR MainDialog::OnGetMinMaxInfo(CONST LPARAM lParam)
 
 INT_PTR MainDialog::OnNotify(CONST LPARAM lParam)
 {
-	LPNMHDR Notification = (LPNMHDR)lParam;
+	// Cast the notification data to a usable format
+	LPNMHDR Notification = reinterpret_cast<LPNMHDR>(lParam);
 
-	// Determine if a link was clicked in our RichEdit window
-	if ((Notification->hwndFrom == m_hWndRichEdit) && (Notification->code == EN_LINK))
-	{
+	// Determine if the notification is a link click in the RichEdit window
+	if ((Notification->hwndFrom == m_hWndRichEdit) && (Notification->code == EN_LINK)) {
 		ENLINK* Link = (ENLINK*)lParam;
-		if (Link->msg == WM_LBUTTONDOWN)
-		{
+
+		// Specifically handle left mouse button clicks on links only
+		if (Link->msg == WM_LBUTTONDOWN) {
+			// Allocate memory to thold the URL based on the link's character range
 			std::unique_ptr<WCHAR[]> Url(new WCHAR[Link->chrg.cpMax - Link->chrg.cpMin + 1]{ 0 });
+
+			// Define a TEXTRANGE structure for retrieving the URL
 			TEXTRANGE TextRange = { Link->chrg, Url.get() };
 
-			try
-			{
-				// Fetch the URL
+			try {
+				// Attempt to retrieve the URL from the RichEdit control
 				if (!SendMessage(m_hWndRichEdit, EM_GETTEXTRANGE, 0, reinterpret_cast<LPARAM>(&TextRange)))
 					throw std::wstring(L"An error occured while trying to read the URL.");
 
-				// Execute the URL
+				// Attempt to open the URL via ShellExecute
 				if ((UINT)ShellExecute(m_hWnd, L"open", Url.get(), NULL, NULL, SW_SHOWNORMAL) <= 32)
 					throw std::wstring(L"An error ocurred while trying to open the URL.");
-			}
-			catch (CONST std::wstring& CustomMessage)
-			{
+			} catch (CONST std::wstring& CustomMessage) {
+				// Provide any errors during the URL retrieval or execution
 				App->DisplayError(CustomMessage);
 			}
 		}
@@ -282,9 +491,11 @@ INT_PTR MainDialog::OnNotify(CONST LPARAM lParam)
 
 INT_PTR MainDialog::OnSize(CONST WPARAM wParam, CONST LPARAM lParam)
 {
+	// Initialize variables for dialog dimensions
 	WORD DialogHeight = HIWORD(lParam);
 	WORD DialogWidth = LOWORD(lParam);
 
+	// Initialize variables for right panel coordinates
 	WORD RightPanelXPos = DialogWidth - 298;
 	WORD RightPanelWidth = 290;
 
@@ -307,7 +518,7 @@ INT_PTR MainDialog::OnSize(CONST WPARAM wParam, CONST LPARAM lParam)
 		GetClientRect(hWnd, &ControlRect);
 		InvalidateRect(hWnd, &ControlRect, TRUE);
 		return TRUE; // Return TRUE to continue enumeration
-		}, NULL);
+	}, NULL);
 
 	return TRUE;
 }

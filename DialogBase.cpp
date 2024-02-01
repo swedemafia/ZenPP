@@ -20,6 +20,7 @@ DialogBase::~DialogBase()
 // Thread for RichEdit output
 DWORD DialogBase::RichEditThreadProc(LPVOID Parameter)
 {
+	// Cast the thread parameter to a usable data type
 	DialogBase* Base = reinterpret_cast<DialogBase*>(Parameter);
 	
 	while (Base->m_RichEditThread != INVALID_HANDLE_VALUE) {
@@ -56,8 +57,10 @@ DWORD DialogBase::RichEditThreadProc(LPVOID Parameter)
 			Offset += ChunkSize;
 		}
 
+		// Pop item from the front of the queue
 		Base->m_RichEditQueue.pop_front();
 
+		// Suspend the thread if the RichEdit queue is empty
 		if (Base->m_RichEditQueue.empty())
 			SuspendThread(Base->m_RichEditThread);
 	}
@@ -75,13 +78,12 @@ VOID DialogBase::BringToForeground(VOID) CONST
 // Method to create the dialog based on the provided resource identifier
 VOID DialogBase::Create(CONST UINT ResourceID)
 {
-	try
-	{
-		// Create the dialog
+	try {
+		// Attempt to create the dialog based on the provided resource identifier
 		if(!(m_hWnd = CreateDialogParam(m_Instance, MAKEINTRESOURCE(ResourceID), nullptr, (DLGPROC)MessageRouter, (LPARAM)this)))
 			throw std::wstring(L"An error occured while creating a dialog.  Please restart the application or contact support for assistance.");
 
-		// Load the dialog icon
+		// Attempt to load the dialog icon
 		if(!(m_Icon = LoadIcon(m_Instance, MAKEINTRESOURCE(ICON_ZENPP))))
 			throw std::wstring(L"An error occured while loading the dialog icon.");
 
@@ -92,9 +94,7 @@ VOID DialogBase::Create(CONST UINT ResourceID)
 		// Destroy the loaded icon
 		DestroyIcon(m_Icon);
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		// Display error message
 		App->DisplayError(CustomMessage);
 	}
@@ -128,10 +128,16 @@ DWORD DialogBase::EditStreamCallback(DWORD_PTR dwCookie, LPBYTE pbBuff, LONG cbB
 }
 
 // Method to retrieve the dialog window handle
-HWND DialogBase::GetHwnd(VOID) CONST
+CONST HWND DialogBase::GetHwnd(VOID) CONST
 {
 	// Return dialog window handle
 	return m_hWnd;
+}
+
+CONST HWND DialogBase::GetRichEditHwnd(VOID) CONST
+{
+	// Return the RichEdit window handle
+	return m_hWndRichEdit;
 }
 
 // Callback function for routing messages
@@ -140,8 +146,7 @@ INT_PTR DialogBase::MessageRouter(CONST HWND hWnd, CONST UINT Message, CONST WPA
 	// Declare pointer to the dialog instance associated with the window
 	DialogBase* Base = NULL;
 
-	switch (Message)
-	{
+	switch (Message) {
 	case WM_INITDIALOG:
 		// Handle dialog creation
 		Base = reinterpret_cast<DialogBase*>(lParam);
@@ -150,8 +155,7 @@ INT_PTR DialogBase::MessageRouter(CONST HWND hWnd, CONST UINT Message, CONST WPA
 		if (!Base) {
 			// Display an error if initialization failed
 			App->DisplayError(L"An error occured while initializing the applicaiton window.\r\n\r\nPlease restart the application or contact support for assistance.");
-		}
-		else {
+		} else {
 			// Store window handle and dialog instance pointer for future access
 			Base->m_hWnd = hWnd;
 
@@ -168,6 +172,8 @@ INT_PTR DialogBase::MessageRouter(CONST HWND hWnd, CONST UINT Message, CONST WPA
 
 	default:
 		// Handle all other messages
+
+		// Case the user data of the dialog to a usable data type
 		Base = reinterpret_cast<DialogBase*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
 		// Handle RichEdit popup menu commands
@@ -251,8 +257,10 @@ VOID DialogBase::PrintText(COLORREF Color, LPCWSTR Format, ...)
 	// End use of argument pointer
 	va_end(argptr);
 
+	// Push the output data to the back of the RichEdit queue
 	m_RichEditQueue.push_back(RichEditOutputData{ Color, std::wstring(Output.get()) });
 
+	// Resume the RichEdit thread if this is the first item added to the queue
 	if (m_RichEditQueue.size() == 1)
 		ResumeThread(m_RichEditThread);
 }
@@ -260,9 +268,8 @@ VOID DialogBase::PrintText(COLORREF Color, LPCWSTR Format, ...)
 // Method for initializing the RichEdit control
 VOID DialogBase::RichEditInitialize(CONST UINT ResourceID, CONST std::wstring& FontFace, CONST LONG Height, CONST LONG Offset)
 {
-	try
-	{
-		// Get window handle
+	try {
+		// Attempt to retrieve the window handle
 		if (!(m_hWndRichEdit = GetDlgItem(m_hWnd, ResourceID)))
 			throw std::wstring(L"An error occured retrieving the handle to the RichEdit window.\r\n\r\nThe application may not perform as intended.");
 
@@ -293,12 +300,9 @@ VOID DialogBase::RichEditInitialize(CONST UINT ResourceID, CONST std::wstring& F
 
 		// Subclass RichEdit
 		RichEditSubClass();
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
-	}
-	catch (CONST std::bad_alloc&) {
+	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Unable to create the RichEdit popup context menu; insufficient memory is available to complete the required operation.");
 	}
 }
@@ -314,8 +318,10 @@ BOOL DialogBase::RichEditSelectAll(VOID) CONST
 // Method for toggling URL detection within the RichEdit window
 VOID DialogBase::RichEditToggleUrlDetection(VOID)
 {
+	// Static variable to track URL detection
 	static BOOL DetectingUrls = FALSE;
 
+	// Toggle the static URL detection variable and update the state of the RichEdit control
 	SendMessage(m_hWndRichEdit, EM_AUTOURLDETECT, (WPARAM)(DetectingUrls = !DetectingUrls), 0);
 }
 
@@ -340,7 +346,6 @@ VOID DialogBase::RegisterDeviceNotifications(CONST GUID Guid)
 {
 	// Register for device change notifications
 	DEV_BROADCAST_DEVICEINTERFACE BroadcastDeviceInterface = { NULL };
-
 	BroadcastDeviceInterface.dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE);
 	BroadcastDeviceInterface.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
 	BroadcastDeviceInterface.dbcc_classguid = Guid;

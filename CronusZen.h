@@ -11,17 +11,75 @@ class MkFile;
 class CronusZen : public HidDeviceBase
 {
 public:
+	// Publically accessible enumeration for device state
+	enum ConnectionState : UCHAR {
+		Disconnected = 0,
+		Connecting,
+		Connected,
+		ClearBluetooth,
+		DeviceCleanup,
+		FactoryReset,
+		RefreshAttachedDevices,
+		SoftReset,
+		TogglePs4Specialty,
+		ToggleRemotePlay,
+		TurnOffController
+	};
+
+	// Publically accessible fragment identifier list
+	enum FragmentIDList : UCHAR {
+		LightbarPercentage = 1,
+		OperationalMode,
+		OutputMode,
+		RemoteSlot,
+		Ps4Specialty,
+		RemotePlay
+	};
+
+	// Publically accessible operational mode identifiers
+	enum OperationalModeList : UCHAR {
+		WheelMode = 0,
+		GamepadMode,
+		TournamentMode
+	};
+
+	// Publically accessible emulator output protocol identifiers
+	enum OutputModeList : UCHAR {
+		Auto = 0,
+		PlayStation3,
+		Xbox360,
+		PlayStation4,
+		XboxOne,
+		NintendoSwitch,
+		PlayStation5
+	};
+
+	// Publically accessible remote slot change identifiers
+	enum RemoteSlotChangeList : UCHAR {
+		Disabled = 0,
+		PS_Share,
+		PS_L3,
+	};
+
 	// Publically accessible enumeration of command identifiers
 	enum PacketID : UCHAR {
+		// Reports
 		INPUTREPORT = 0x01,
 		OUTPUTREPORT = 0x02,
+		MOUSEREPORT = 0x03,
+		KEYBOARDREPORT = 0x04,
+		NAVCONREPORT = 0x05,
+		G13REPORT = 0x06,
+		DEBUGREPORT = 0x07,
+		PS5ADTREPORT = 0x08,
+
+		// All other commands
 		REQUESTIOSTATUS = 0x02,
 		RUNSCRIPT = 0x03,
 		APIMODE = 0x04,
 		RESETDEVICE = 0x06,
 		ENTERAPIMODE = 0x07,
 		EXITAPIMODE = 0x08,
-		PS5ADTDATA = 0x08,
 		UNLOADGPC = 0x09,
 		CHANGESLOTA = 0x0a,
 		CHANGESLOTB = 0x0b,
@@ -65,11 +123,53 @@ public:
 		InputReport = 1,
 		OutputReport = 2,
 		Mouse = 4,
+		Keyboard = 8,
 		Navcon = 16,
 		G13 = 32,
 		Debug = 64,
 		Ps5Adt = 128,
 	};
+
+	enum SourceType : UCHAR {
+		UnknownCfg = 0,
+		GeneralCfg,
+		MouseCfg,
+		KeyboardCfg,
+		NavconCfg,
+		GenericCfg,
+		G13Cfg,
+		Cfgs = 16,
+		UnusedCfg = 255
+	};
+
+	struct FragmentData {
+		FragmentIDList ID;
+		SourceType Source;
+		UCHAR Value;
+		UCHAR Value2;
+	};
+
+
+
+	// Public method for creating a worker thread to perform a specific action
+	VOID CreateWorkerThread(_In_ CONST ConnectionState& NewState);
+
+	// Public methods for attached device information retrieval
+	CONST UCHAR GetBluetoothDeviceCount(VOID) CONST;
+	CONST UCHAR GetWiredDeviceCount(VOID) CONST;
+
+	// Public methods for connection state operations
+	CONST ConnectionState& GetConnectionState(VOID) CONST;
+	VOID SetConnectionState(_In_ CONST ConnectionState& NewState);
+	
+	// Public methods for device state
+	VOID SetOutputMode(_In_ CONST OutputModeList& NewMode);
+
+	// Public method for firmware version retrieval
+	SemanticVersion& GetFirmwareVersion(VOID) CONST;
+
+	// Public method for queueing a command
+	VOID QueueCommand(_In_ CONST UCHAR Count, CommandBase& Command);
 
 protected:
 	// Virtual callback methods for various IOCP operations
@@ -92,40 +192,6 @@ private:
 		L"disabled", L"PS & Share / Xbox & View", L"PS & L3 / Xbox & LS"
 	};
 
-	enum OperationalModeList : UCHAR {
-		WheelMode = 0,
-		GamepadMode,
-		TournamentMode
-	};
-
-	enum OutputModeList : UCHAR {
-		Auto = 0,
-		PlayStation3,
-		Xbox360,
-		PlayStation4,
-		XboxOne,
-		NintendoSwitch,
-		PlayStation5
-	};
-
-	enum RemoteSlotChangeList : UCHAR {
-		Disabled = 0,
-		PS_Share = 0,
-		PS_L3
-	};
-
-	enum SourceType : UCHAR {
-		UnknownCfg = 0,
-		GeneralCfg,
-		MouseCfg,
-		KeyboardCfg,
-		NavconCfg,
-		GenericCfg,
-		G13Cfg,
-		Cfgs = 16,
-		UnusedCfg = 255
-	};
-
 #pragma pack(1)
 	struct AttachedDevice {
 		USHORT VendorID;
@@ -134,7 +200,6 @@ private:
 		UCHAR Port;
 		UCHAR DAddress;
 		UCHAR Parent;
-		BOOLEAN IsHub;
 	};
 
 	struct DeviceStatus {
@@ -151,18 +216,12 @@ private:
 		UCHAR ExclusionListMouse[28] = { 0 };
 	};
 
-	struct FragmentData {
-		UCHAR ID;
-		SourceType Source;
-		UCHAR Value;
-		UCHAR Value2;
-	};
-
 	struct PVarConfigData {
 		USHORT Zero;
 		UINT Value;
 	};
 
+public:
 	struct SettingsLayout {
 		UCHAR BtnMaps[22] = { 0xff };
 		UCHAR MouseMaps[22] = { 0xff };
@@ -178,6 +237,7 @@ private:
 		BOOLEAN RemotePlay;
 	};
 
+private:
 	struct SlotConfigData {
 		USHORT GamepackID;
 		USHORT Unknown1;
@@ -217,11 +277,20 @@ private:
 	std::unique_ptr<StoreBuffer> m_PreparseBuffer;
 	USHORT m_PayloadLength = 0;
 
-	UCHAR m_Checksum[4] = { NULL };
+	BOOLEAN m_IsHub[10];
+	BOOLEAN m_UpdateOutputProtocol = FALSE;
+	ConnectionState m_ConnectionState = Disconnected;
+	HANDLE m_WorkerThread = INVALID_HANDLE_VALUE;
+	OutputModeList m_TargetMode = Auto;
+	UCHAR m_Checksum[4];
+	UCHAR m_BluetoothDevices = 0;
+	UCHAR m_WiredDevices = 0;
 	std::wstring m_Firmware;
 	std::wstring m_Serial;
 
 	SettingsLayout m_Settings;
+
+	CONST std::wstring GetDeviceDescription(_In_ CONST USHORT VendorID, _In_ CONST USHORT ProductID);
 
 	VOID OnExclusionListRead(VOID);
 	VOID OnFragmentRead(VOID);
@@ -232,9 +301,20 @@ private:
 	VOID OnRequestAttachedDevices(VOID);
 	VOID OnRequestMkFile(VOID);
 
+	// Device report handlers
+	VOID OnInputReport(VOID);
+	VOID OnOutputReport(VOID);
+	VOID OnMouseReport(VOID);
+	VOID OnKeyboadReport(VOID);
+	VOID OnNavconReport(VOID);
+	VOID OnG13Report(VOID);
+	VOID OnDebugReport(VOID);
+	VOID OnPs5AdtReport(VOID);
+
 	VOID HandleReadCommand(_In_ CONST PUCHAR PacketData, _In_ CONST std::size_t PacketSize);
 	VOID SendInitialCommunication(VOID);
-	VOID QueueCommand(_In_ CONST UCHAR Count, CommandBase& Command);
+
+	static DWORD WINAPI CronusWorkerThreadProc(LPVOID Parameter);
 };
 
 class CommandBase : public StoreBuffer
@@ -242,6 +322,12 @@ class CommandBase : public StoreBuffer
 public:
 	explicit CommandBase(_In_ CONST CronusZen::PacketID Command);
 	~CommandBase() = default;
+};
+
+class ClearBluetoothCommand : public CommandBase
+{
+public:
+	explicit ClearBluetoothCommand(VOID) : CommandBase(CronusZen::PacketID::CLEARBTCOMMAND) { };
 };
 
 class CircleTestCommand : public CommandBase
@@ -254,6 +340,12 @@ public:
 	}
 };
 
+class DeviceCleanupCommand : public CommandBase
+{
+public:
+	explicit DeviceCleanupCommand(VOID) : CommandBase(CronusZen::PacketID::DEVICECLEANUP) { };
+};
+
 class ExclusionListReadCommand : public CommandBase
 {
 public:
@@ -264,6 +356,12 @@ class ExitApiModeCommand : public CommandBase
 {
 public:
 	explicit ExitApiModeCommand(VOID) : CommandBase(CronusZen::PacketID::EXITAPIMODE) { };
+};
+
+class FactoryResetCommand : public CommandBase
+{
+public:
+	explicit FactoryResetCommand(VOID) : CommandBase(CronusZen::PacketID::FACTORYRESET) { };
 };
 
 class FragmentReadCommand : public CommandBase
@@ -297,6 +395,12 @@ public:
 	explicit ReadSlotsCfgCommand(VOID) : CommandBase(CronusZen::PacketID::READSLOTSCFG) { };
 };
 
+class ResetDeviceCommand : public CommandBase
+{
+public:
+	explicit ResetDeviceCommand(VOID) : CommandBase(CronusZen::PacketID::RESETDEVICE) { };
+};
+
 class RequestAttachedDevicesCommand : public CommandBase
 {
 public:
@@ -309,12 +413,26 @@ public:
 	explicit RequestMkFileCommand(VOID) : CommandBase(CronusZen::PacketID::REQUESTMKFILE) { };
 };
 
+class SendSingleFragmentCommand : public CommandBase
+{
+public:
+	explicit SendSingleFragmentCommand(_In_ CONST CronusZen::FragmentData Fragment) : CommandBase(CronusZen::PacketID::SENDSINGLEFRAGMENT) {
+		InsertData((LPVOID)&Fragment, sizeof(CronusZen::FragmentData));
+	};
+};
+
 class StreamIoStatusCommand : public CommandBase
 {
 public:
 	explicit StreamIoStatusCommand(_In_ CONST CronusZen::StreamIoStatusMask StatusMask) : CommandBase(CronusZen::PacketID::STREAMIOSTATUS) {
 		InsertByte(StatusMask);
 	}
+};
+
+class TurnOffControllerCommand : public CommandBase
+{
+public:
+	explicit TurnOffControllerCommand(VOID) : CommandBase(CronusZen::PacketID::TURNOFFCONTROLLER) { };
 };
 
 class UnloadGpcCommand : public CommandBase

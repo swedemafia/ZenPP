@@ -4,8 +4,7 @@ INT_PTR AboutDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONS
 {
 	AboutDialog* Dialog = reinterpret_cast<AboutDialog*>(GetWindowLongPtr(m_hWnd, GWLP_USERDATA));
 
-	switch (Message)
-	{
+	switch (Message) {
 	case WM_CLOSE:					return Dialog->OnClose();
 	case WM_COMMAND:				return Dialog->OnCommand(wParam, lParam);
 	case WM_CTLCOLORSTATIC:			return Dialog->OnCtlColorStatic(wParam, lParam);
@@ -24,8 +23,7 @@ INT_PTR AboutDialog::OnClose(VOID)
 
 INT_PTR AboutDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 {
-	switch (LOWORD(wParam))
-	{
+	switch (LOWORD(wParam)) {
 	case BUTTON_ABOUT_OK:							return OnClose();
 	}
 	return FALSE;
@@ -38,8 +36,7 @@ INT_PTR AboutDialog::OnCtlColorStatic(CONST WPARAM wParam, CONST LPARAM lParam)
 		SetTextColor(Static, WHITE);
 		SetBkColor(Static, BLACK);
 		return reinterpret_cast<INT_PTR>(GetStockObject(BLACK_BRUSH));
-	}
-	else {
+	} else {
 		return DefWindowProc(m_hWnd, WM_CTLCOLORSTATIC, wParam, lParam);
 	}
 }
@@ -60,7 +57,7 @@ INT_PTR AboutDialog::OnInitDialog(VOID)
 	DisclaimerString += L"Zen++ demonstrates interoperability with the Cronus Zen gaming device.\r\n\r\n";
 	DisclaimerString += L"Zen++ includes references to trademarks and registered trademarks owned by Collective Minds Gaming Company, Inc.; Nintendo Co., Ltd.; Sony Computer Entertainment; and Microsoft Inc.\r\n\r\n";
 	DisclaimerString += L"Zen++, and its author, is not affiliated with, endorsed by, or sponsored by Collective Minds Gaming Company, Inc.; Nintendo Co., Ltd.; Sony Computer Entertainment; or Microsoft Inc.\r\n\r\n";
-	DisclaimerString += L"\"Cronus Zen\", \"Nintendo\", \"Switch\", \"Wii\", \"Wii U\", \"PlayStation\", \"PlayStation 3\", \"PlayStation 4\", \"PlayStation 5\", \"DualShock\", \"DualSense\", \"Remote Play\", \"Xbox\", \"Xbox 360\", \"Xbox One\", and \"Xbox Series X|S\" are trademarks or registered trademarks of their respective owners.\r\n\r\n";
+	DisclaimerString += L"\"Cronus Zen\", \"Nintendo\", \"Switch\", \"Wii\", \"Wii U\", \"PlayStation\", \"PlayStation 3\", \"PlayStation 4\", \"PlayStation 5\", \"DualShock\", \"DualSense\", \"PULSE 3D\", \"Remote Play\", \"Xbox\", \"Xbox 360\", \"Xbox One\", and \"Xbox Series X|S\" are trademarks or registered trademarks of their respective owners.\r\n\r\n";
 	DisclaimerString += L"The use of these trademarks is for informational purposes only, to accurately describe the compatibility or features of Zen++ with products from these companies.";
 
 	// Set label text

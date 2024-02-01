@@ -18,8 +18,7 @@ IoCompletionPortBase::~IoCompletionPortBase()
 // Method for associating an open file (device) handle with an IOCP
 CONST BOOL IoCompletionPortBase::AssociateWithIocp(CONST HANDLE FileHandle)
 {
-	try
-	{
+	try {
 		// Create IOCP to associate with an open file (device) handle
 		if (!(m_IocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1)))
 			throw std::wstring(L"An error occured while creating an I/O completion port.");
@@ -32,9 +31,7 @@ CONST BOOL IoCompletionPortBase::AssociateWithIocp(CONST HANDLE FileHandle)
 		if ((m_IocpThreadHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)IocpEventThreadProc, (LPVOID)this, CREATE_SUSPENDED, NULL)) == INVALID_HANDLE_VALUE)
 			throw std::wstring(L"An error occured while creating the I/O completion port event thread.");
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		// Notify user of the failure relevant to associating an IOCP with an open file (device) handle
 		App->DisplayError(CustomMessage);
 
@@ -108,8 +105,7 @@ DWORD IoCompletionPortBase::IocpEventThreadProc(LPVOID Parameter)
 		if (GetQueuedCompletionStatus(Base->m_IocpHandle, &NumberOfBytesTransferred, &CompletionKey, Overlapped.get(), INFINITE)) {
 			// Call IOCP event handler to dispatch the event
 			Base->HandleCompletionEvent(NumberOfBytesTransferred, *Overlapped.get());
-		}
-		else {
+		} else {
 			// Post queued completion status for the client device closing the connection 
 			PostQueuedCompletionStatus(Base->m_IocpHandle, 0, IocpCompletionKey::Disconnect, &Base->m_OverlappedDisconnect.Overlapped);
 		}
@@ -124,8 +120,7 @@ VOID IoCompletionPortBase::HandleCompletionEvent(_In_ CONST DWORD BytesTransferr
 	OverlappedEx* Operation = CONTAINING_RECORD(Overlapped, OverlappedEx, Overlapped);
 
 	// Dispatch event handler based on the completion key
-	switch (Operation->CompletionKey)
-	{
+	switch (Operation->CompletionKey) {
 	case IocpCompletionKey::Connect:
 		// Handle successful connection
 		if (OnConnect()) {

@@ -20,6 +20,7 @@ public:
 	VOID DisplaySupportInfo(VOID);
 
 	// Public methods for device management
+	VOID UpdateDeviceMenu(_In_ CONST CronusZen::SettingsLayout& Settings);
 	VOID UpdateFeatureAvailability(_In_ CONST BOOL Enabled);
 	VOID UpdateSlotsData(_In_ CONST UCHAR SlotsUsed, _In_ CONST UINT BytesUsed);
 
@@ -40,13 +41,39 @@ private:
 	HWND m_hWndSlotsTitle = NULL;
 
 	// Private methods for handling specific commands
+	// Dialog buttons
+	INT_PTR OnCommandMainEraseAllScripts(VOID);
+	INT_PTR OnCommandMainFactoryReset(VOID);
+	INT_PTR OnCommandMainSoftReset(VOID);
+
+	// 'Connection' menu
 	INT_PTR OnCommandConnectionDisconnect(VOID);
 	INT_PTR OnCommandConnectionReconnect(VOID);
+
+	// 'Device' menu
+	INT_PTR OnCommandDeviceClearBluetoothDevices(VOID);
+	INT_PTR OnCommandDeviceEopAuto(VOID);
+	INT_PTR OnCommandDeviceEopNintendoSwitch(VOID);
+	INT_PTR OnCommandDeviceEopPcMobileXbox360(VOID);
+	INT_PTR OnCommandDeviceEopPlayStation3(VOID);
+	INT_PTR OnCommandDeviceEopPlayStation4(VOID);
+	INT_PTR OnCommandDeviceEopPlayStation5(VOID);
+	INT_PTR OnCommandDeviceEopXboxOne(VOID);
+	INT_PTR OnCommandDevicePs4Specialty(VOID);
+	INT_PTR OnCommandDeviceRefreshAttachedDevices(VOID);
+	INT_PTR OnCommandDeviceRemotePlay(VOID);
+	INT_PTR OnCommandDeviceTurnOffController(VOID);
+
+	// 'File' menu
 	INT_PTR OnCommandFileExit(VOID);
+
+	// 'Firmware' menu
 	INT_PTR OnCommandFirmwareCompatible(VOID);
 	INT_PTR OnCommandFirmwareCustom(VOID);
 	INT_PTR OnCommandFirmwareErase(VOID);
 	INT_PTR OnCommandFirmwareLatest(VOID);
+
+	// 'Help' menu
 	INT_PTR OnCommandHelpAbout(VOID);
 	INT_PTR OnCommandHelpZenPPNews(VOID);
 
@@ -61,6 +88,9 @@ private:
 	INT_PTR OnInitDialog(VOID);
 	INT_PTR OnNotify(_In_ CONST LPARAM lParam);
 	INT_PTR OnSize(_In_ CONST WPARAM wParam, _In_ CONST LPARAM lParam);
+
+	// Private method for managing checkboxes on menus
+	VOID UncheckAllMenuItems(CONST HMENU Menu);
 };
 
 #endif

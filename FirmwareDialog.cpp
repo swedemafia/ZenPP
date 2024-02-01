@@ -15,8 +15,7 @@ INT_PTR FirmwareDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, C
 {
 	FirmwareDialog* Dialog = reinterpret_cast<FirmwareDialog*>(GetWindowLongPtr(m_hWnd, GWLP_USERDATA));
 
-	switch (Message)
-	{
+	switch (Message) {
 	case WM_CLOSE:					return Dialog->OnClose();
 	case WM_COMMAND:				return Dialog->OnCommand(wParam, lParam);
 	case WM_DESTROY:				return Dialog->OnDestroy();
@@ -49,8 +48,7 @@ INT_PTR FirmwareDialog::OnClose(VOID)
 
 INT_PTR FirmwareDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 {
-	switch (LOWORD(wParam))
-	{
+	switch (LOWORD(wParam)) {
 	case BUTTON_FIRMWARE_BACK:							return OnCommandButtonFirmwareBack();
 	case BUTTON_FIRMWARE_CANCEL:						return OnClose();
 	case BUTTON_FIRMWARE_NEXT:							return OnCommandButtonFirmwareNext();
@@ -68,8 +66,7 @@ INT_PTR FirmwareDialog::OnDestroy(VOID)
 INT_PTR FirmwareDialog::OnDeviceChange(CONST WPARAM wParam)
 {
 	// When a device arrives or is removed
-	if (wParam == DBT_DEVICEARRIVAL || wParam == DBT_DEVICEREMOVECOMPLETE)
-	{
+	if (wParam == DBT_DEVICEARRIVAL || wParam == DBT_DEVICEREMOVECOMPLETE) {
 		// Only update for our device only
 		if((m_Manager->IsDeviceFound() != m_Manager->SearchForDevice()) && !m_Manager->UpdateCompleted())
 			UpdateCapabilities();
@@ -80,8 +77,7 @@ INT_PTR FirmwareDialog::OnDeviceChange(CONST WPARAM wParam)
 
 INT_PTR FirmwareDialog::OnInitDialog(VOID)
 {
-	try
-	{
+	try {
 		// Get dialog control handles
 		m_ButtonBack = GetDlgItem(m_hWnd, BUTTON_FIRMWARE_BACK);
 		m_ButtonCancel = GetDlgItem(m_hWnd, BUTTON_FIRMWARE_CANCEL);
@@ -110,13 +106,11 @@ INT_PTR FirmwareDialog::OnInitDialog(VOID)
 		// Update window caption
 		SetWindowText(m_hWnd, std::wstring_view(L"Zen++ Firmware Manager - " + m_WindowTitle[m_Purpose]).data());
 
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+	} catch (CONST std::wstring& CustomMessage) {
 		App->DisplayError(CustomMessage);
 		OnClose();
-	}
-	catch (CONST std::bad_alloc&) {
+
+	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Unable to create the FirmwareManager object; insufficient memory is available to complete the required operation.");
 		OnClose();
 	}
@@ -132,23 +126,20 @@ VOID FirmwareDialog::ChangeModificationStep(_In_ CONST BOOLEAN Forwards)
 
 VOID FirmwareDialog::UpdateCapabilities(VOID)
 {
-	if (m_Step < 2)
-	{
+	if (m_Step < 2) {
 		if (!m_Step) {
 			EnableWindow(m_ButtonBack, FALSE);
 			EnableWindow(m_ButtonNext, TRUE);
 			SetWindowText(m_LabelStatus, L"The CONSOLE/PC USB port is located on the backside of your Cronus Zen.");
 			UpdateInstructions();
-		}
-		else {
+		} else {
 			BOOL DeviceFound = m_Manager->IsDeviceFound();
 			EnableWindow(m_ButtonBack, !DeviceFound);
 			EnableWindow(m_ButtonNext, DeviceFound);
 			SetWindowText(m_LabelStatus, m_DeviceState[DeviceFound].c_str());
 			UpdateInstructions();
 		}
-	}
-	else {
+	} else {
 		if (m_Manager->IsDeviceFound()) {
 			EnableWindow(m_ButtonNext, FALSE);
 			ShowWindow(m_EditDescriptors, SW_SHOW);
@@ -159,8 +150,7 @@ VOID FirmwareDialog::UpdateCapabilities(VOID)
 			if (!m_Manager->PerformModification())
 				OnClose();
 
-		}
-		else {
+		} else {
 			// TODO: finish this
 			OnClose();
 		}
@@ -174,10 +164,8 @@ VOID FirmwareDialog::UpdateInstructions(VOID)
 		SetWindowText(m_LabelStep, std::wstring_view(L"Step " + std::to_wstring(m_Step + 1) + L":").data());
 
 		// Only update Bitmap for the first two steps
-		if (m_Step != 2)
-		{
-			try
-			{
+		if (m_Step != 2) {
+			try {
 				// Update Picture control
 				HBITMAP Bitmap = LoadBitmap(App->GetInstance(), MAKEINTRESOURCE(BITMAP_FIRMWARE_STEP1 + m_Step));
 
@@ -190,9 +178,7 @@ VOID FirmwareDialog::UpdateInstructions(VOID)
 
 				// Delete Bitmap
 				DeleteObject(Bitmap);
-			}
-			catch (CONST std::wstring& CustomMesage)
-			{
+			} catch (CONST std::wstring& CustomMesage) {
 				App->DisplayError(CustomMesage);
 			}
 		}
