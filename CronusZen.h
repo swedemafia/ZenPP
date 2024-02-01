@@ -23,12 +23,14 @@ public:
 		SoftReset,
 		TogglePs4Specialty,
 		ToggleRemotePlay,
-		TurnOffController
+		TurnOffController,
+		UpdateConfig
 	};
 
 	// Publically accessible fragment identifier list
 	enum FragmentIDList : UCHAR {
-		LightbarPercentage = 1,
+		FragmentUnused = 0,
+		LightbarPercentage,
 		OperationalMode,
 		OutputMode,
 		RemoteSlot,
@@ -163,7 +165,7 @@ public:
 	VOID SetConnectionState(_In_ CONST ConnectionState& NewState);
 	
 	// Public methods for device state
-	VOID SetOutputMode(_In_ CONST OutputModeList& NewMode);
+	VOID SetFragment(_In_ CONST FragmentIDList& Fragment, _In_ CONST UCHAR NewValue);
 
 	// Public method for firmware version retrieval
 	SemanticVersion& GetFirmwareVersion(VOID) CONST;
@@ -180,6 +182,10 @@ protected:
 
 private:
 
+	CONST std::wstring m_Console[9] = {
+		L"", L"PlayStation 3", L"Xbox 360", L"PlayStation 4", L"Xbox One X|S", L"Nintendo Switch", L"PlayStation 5", L"", L"Wheel"
+	};
+
 	CONST std::wstring m_OperationalMode[3] = {
 		L"wheel", L"normal", L"tournament"
 	};
@@ -190,6 +196,55 @@ private:
 
 	CONST std::wstring m_RemoteSlot[3] = {
 		L"disabled", L"PS & Share / Xbox & View", L"PS & L3 / Xbox & LS"
+	};
+
+	enum CfgState : UCHAR {
+		HIP = 0,
+		ADS,
+		AUX1,
+		AUX2,
+		AUX3,
+		AUX4
+	};
+
+	enum ConsoleType : UCHAR {
+		NoConsole,
+		Ps3Console,
+		Xb360Console,
+		Ps4Console,
+		Xb1Console,
+		SwitchConsole,
+		Ps5Console,
+		Wheel = 8
+	};
+
+	enum ControllerType : UCHAR {
+		NoController,
+		Ps3 = 16,
+		Xb360 = 32,
+		Wii = 48,
+		WiiN,
+		WiiPro,
+		SwitchPro,
+		SwitchCon,
+		WiiuPro,
+		Ps4 = 64,
+		Ps5,
+		Xb1 = 80,
+		G920H = 98,
+		Df = 100,
+		DfPro = 104,
+		G25 = 105,
+		Dfgt = 106,
+		G27 = 107,
+		G29 = 112,
+		G920X = 128,
+		KEYBMOUSE = 144
+	};
+
+	enum LedState : UCHAR {
+		LedOff,
+		LedOn
 	};
 
 #pragma pack(1)
@@ -214,6 +269,39 @@ private:
 	struct ExclusionListData {
 		UCHAR ExclusionListKeyboard[28] = { 0 };
 		UCHAR ExclusionListMouse[28] = { 0 };
+	};
+
+	struct InputReportData {
+		USHORT CpuLoadValue;
+		UCHAR SlotValue;
+		ControllerType ConnectedController;
+		ConsoleType ConnectedConsole;
+		LedState LedState1;
+		LedState LedState2;
+		LedState LedState3;
+		LedState LedState4;
+		UCHAR RumbleValueA;
+		UCHAR RumbleValueB;
+		UCHAR RumbleValueRt;
+		UCHAR RumbleValueLt;
+		UCHAR BatteryValue;
+		UCHAR Input[38];
+		UCHAR Unused[4];
+		UCHAR ReportType;
+		UCHAR VmSpeedValue;
+		USHORT TimestampCounter;
+	};
+
+	struct OutputReportData {
+		UCHAR Output[38];
+		ULONG Trace1;
+		ULONG Trace2;
+		ULONG Trace3;
+		USHORT Trace4;
+		USHORT Trace5;
+		USHORT Trace6;
+		BYTE Unknown;
+		CfgState CfgState;
 	};
 
 	struct PVarConfigData {
@@ -271,17 +359,18 @@ private:
 
 	// Firmware version information
 	std::unique_ptr<SemanticVersion> m_SemanticVersion;
-	
+
 	// Read command processing
 	std::unique_ptr<ParseBuffer> m_ParseBuffer;
 	std::unique_ptr<StoreBuffer> m_PreparseBuffer;
 	USHORT m_PayloadLength = 0;
 
 	BOOLEAN m_IsHub[10];
-	BOOLEAN m_UpdateOutputProtocol = FALSE;
+	FragmentIDList m_UpdateFragmentType = FragmentUnused;
 	ConnectionState m_ConnectionState = Disconnected;
 	HANDLE m_WorkerThread = INVALID_HANDLE_VALUE;
-	OutputModeList m_TargetMode = Auto;
+	InputReportData m_LastInputReport;
+	UCHAR m_TargetMode = 0;
 	UCHAR m_Checksum[4];
 	UCHAR m_BluetoothDevices = 0;
 	UCHAR m_WiredDevices = 0;
@@ -289,6 +378,8 @@ private:
 	std::wstring m_Serial;
 
 	SettingsLayout m_Settings;
+
+	VOID DestroyWorkerThread(VOID);
 
 	CONST std::wstring GetDeviceDescription(_In_ CONST USHORT VendorID, _In_ CONST USHORT ProductID);
 
@@ -322,6 +413,18 @@ class CommandBase : public StoreBuffer
 public:
 	explicit CommandBase(_In_ CONST CronusZen::PacketID Command);
 	~CommandBase() = default;
+};
+
+class ChangeSlotACommand : public CommandBase
+{
+public:
+	explicit ChangeSlotACommand(VOID) : CommandBase(CronusZen::PacketID::CHANGESLOTA) { };
+};
+
+class ChangeSlotBCommand : public CommandBase
+{
+public:
+	explicit ChangeSlotBCommand(VOID) : CommandBase(CronusZen::PacketID::CHANGESLOTB) { };
 };
 
 class ClearBluetoothCommand : public CommandBase

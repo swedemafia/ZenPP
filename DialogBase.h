@@ -5,6 +5,9 @@
 #pragma once
 #endif
 
+// Forward declarations
+class CronusZen;
+
 class DialogBase {
 public:
     // Constructor and destructor
@@ -28,6 +31,8 @@ public:
     VOID RichEditSubClass(VOID);
 
 protected:
+    // Protected member Cronus Zen object for ease of accessibility
+    CronusZen& m_CronusZen;
 
     // Protected members for RichEdit control
     HWND m_hWndRichEdit = NULL;

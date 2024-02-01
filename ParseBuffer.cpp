@@ -22,6 +22,11 @@ CONST std::size_t ParseBuffer::Position(VOID) CONST
 	return m_Position;
 }
 
+CONST std::size_t ParseBuffer::SizeWithoutHeader(VOID) CONST
+{
+	return m_Size - 4;
+}
+
 CONST std::size_t ParseBuffer::Size(VOID) CONST
 {
 	return m_Size;

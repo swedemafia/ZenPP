@@ -133,14 +133,14 @@ VOID MainDialog::UpdateDeviceMenu(_In_ CONST CronusZen::SettingsLayout& Settings
 	}
 
 	// Check for PlayStation 5 option disable
-	EnableMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION5, MF_BYCOMMAND | (App->GetCronusZen().GetFirmwareVersion().IsBeta() ? MF_DISABLED : MF_ENABLED));
+	EnableMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION5, MF_BYCOMMAND | (m_CronusZen.GetFirmwareVersion().IsBeta() ? MF_DISABLED : MF_ENABLED));
 }
 
 // Method to enable/disable features based on the connection state
 VOID MainDialog::UpdateFeatureAvailability(CONST BOOL Enabled)
 {
-	// Enable/disable the "Disconnect From Device" menu item
-	EnableMenuItem(m_Menu, MENU_CONNECTION_DISCONNECT, MF_BYCOMMAND | (Enabled ? MF_ENABLED : MF_DISABLED));
+	// Enable/disable the "Reconnect To Device" menu item
+	EnableMenuItem(m_Menu, MENU_CONNECTION_RECONNECT, MF_BYCOMMAND | (Enabled ? MF_ENABLED : MF_DISABLED));
 
 	// Enable/disable the entire "Device" menu
 	EnableMenuItem(m_Menu, 3, MF_BYPOSITION | (Enabled ? MF_ENABLED : MF_DISABLED));
@@ -210,7 +210,18 @@ INT_PTR MainDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONST
 
 INT_PTR MainDialog::OnClose(VOID)
 {
+	// Initialize variable for ease of accessibility
+	CronusZen& Cronus = App->GetCronusZen();
+
+	// Exit API mode if connected
+	if (Cronus.GetConnectionState() == CronusZen::Connected) {
+		std::unique_ptr<ExitApiModeCommand> ExitApiMode(new ExitApiModeCommand);
+		Cronus.QueueCommand(1, *ExitApiMode);
+	}
+
+	// Destroy dialog
 	DestroyWindow(m_hWnd);
+
 	return TRUE;
 }
 
@@ -220,9 +231,20 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	case BUTTON_MAIN_ERASEALLSCRIPTS:				return OnCommandMainEraseAllScripts();
 	case BUTTON_MAIN_FACTORYRESET:					return OnCommandMainFactoryReset();
 	case BUTTON_MAIN_SOFTRESET:						return OnCommandMainSoftReset();
+
+	// 'Connection'
 	case MENU_CONNECTION_DISCONNECT:				return OnCommandConnectionDisconnect();
 	case MENU_CONNECTION_RECONNECT:					return OnCommandConnectionReconnect();
+
+	// 'Device'
 	case MENU_DEVICE_CLEARBLUETOOTHDEVICES:			return OnCommandDeviceClearBluetoothDevices();
+	case MENU_DEVICE_CYCLESLOTS:					return OnCommandDeviceCycleSlots();
+	case MENU_DEVICE_REFRESHATTACHEDDEVICES:		return OnCommandDeviceRefreshAttachedDevices();
+	case MENU_DEVICE_PS4SPECIALTY:					return OnCommandDevicePs4Specialty();
+	case MENU_DEVICE_REMOTEPLAY:					return OnCommandDeviceRemotePlay();
+	case MENU_DEVICE_TURNOFFCONTROLLER:				return OnCommandDeviceTurnOffController();
+
+	// 'Device' -> 'Emulator Output Protocol'
 	case MENU_DEVICE_EOP_AUTO:						return OnCommandDeviceEopAuto();
 	case MENU_DEVICE_EOP_NINTENDOSWITCH:			return OnCommandDeviceEopNintendoSwitch();
 	case MENU_DEVICE_EOP_PCMOBILEXBOX360:			return OnCommandDeviceEopPcMobileXbox360();
@@ -230,15 +252,27 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	case MENU_DEVICE_EOP_PLAYSTATION4:				return OnCommandDeviceEopPlayStation4();
 	case MENU_DEVICE_EOP_PLAYSTATION5:				return OnCommandDeviceEopPlayStation5();
 	case MENU_DEVICE_EOP_XBOXONEX:					return OnCommandDeviceEopXboxOne();
-	case MENU_DEVICE_REFRESHATTACHEDDEVICES:		return OnCommandDeviceRefreshAttachedDevices();
-	case MENU_DEVICE_PS4SPECIALTY:					return OnCommandDevicePs4Specialty();
-	case MENU_DEVICE_REMOTEPLAY:					return OnCommandDeviceRemotePlay();
-	case MENU_DEVICE_TURNOFFCONTROLLER:				return OnCommandDeviceTurnOffController();
+
+	// 'Device' -> 'Operational Mode'
+	case MENU_DEVICE_OM_NORMAL:						return OnCommandDeviceOmNormal();
+	case MENU_DEVICE_OM_TOURNAMENT:					return OnCommandDeviceOmTournament();
+	case MENU_DEVICE_OM_WHEEL:						return OnCommandDeviceOmWheel();
+
+	// 'Device' -> 'Remote Slot Change'
+	case MENU_DEVICE_RSC_DISABLED:					return OnCommandDeviceRscDisable();
+	case MENU_DEVICE_RSC_PSL3:						return OnCommandDeviceRscPSL3();
+	case MENU_DEVICE_RSC_PSSHARE:					return OnCommandDeviceRscPSShare();
+
+	// 'File'
 	case MENU_FILE_EXIT:							return OnCommandFileExit();
+
+	// 'Firmware'
 	case MENU_FIRMWARE_COMPATIBLE:					return OnCommandFirmwareCompatible();
 	case MENU_FIRMWARE_CUSTOM:						return OnCommandFirmwareCustom();
 	case MENU_FIRMWARE_ERASE:						return OnCommandFirmwareErase();
 	case MENU_FIRMWARE_LATEST:						return OnCommandFirmwareLatest();
+
+	// 'Help'
 	case MENU_HELP_ABOUT:							return OnCommandHelpAbout();
 	case MENU_HELP_NEWS:							return OnCommandHelpZenPPNews();
 	}
@@ -247,104 +281,159 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 
 INT_PTR MainDialog::OnCommandMainEraseAllScripts(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::DeviceCleanup);
+	m_CronusZen.CreateWorkerThread(CronusZen::DeviceCleanup);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandMainFactoryReset(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::FactoryReset);
+	m_CronusZen.CreateWorkerThread(CronusZen::FactoryReset);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandMainSoftReset(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::SoftReset);
+	m_CronusZen.CreateWorkerThread(CronusZen::SoftReset);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandConnectionDisconnect(VOID)
 {
-	App->GetCronusZen().DisconnectFromDevice();
+	m_CronusZen.DisconnectFromDevice();
+	m_CronusZen.SetConnectionState(CronusZen::Disconnected);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandConnectionReconnect(VOID)
 {
-	App->GetCronusZen().DisconnectFromDevice();
-	App->GetCronusZen().ConnectToDevice();
+	m_CronusZen.DisconnectFromDevice();
+	m_CronusZen.ConnectToDevice();
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandDeviceClearBluetoothDevices(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::ClearBluetooth);
+	m_CronusZen.CreateWorkerThread(CronusZen::ClearBluetooth);
 	return TRUE;
 }
 
-INT_PTR MainDialog::OnCommandDeviceEopAuto(VOID)
+INT_PTR MainDialog::OnCommandDeviceCycleSlots(VOID)
 {
-	App->GetCronusZen().SetOutputMode(CronusZen::Auto);
-	return TRUE;
-}
+	// Build required commands to change the running slot
+	std::unique_ptr<ChangeSlotACommand> ChangeSlotA(new ChangeSlotACommand);
+	std::unique_ptr<ChangeSlotBCommand> ChangeSlotB(new ChangeSlotBCommand);
+	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
 
-INT_PTR MainDialog::OnCommandDeviceEopNintendoSwitch(VOID)
-{
-	App->GetCronusZen().SetOutputMode(CronusZen::NintendoSwitch);
-	return TRUE;
-}
+	// Queue commands to be sent to the device
+	m_CronusZen.QueueCommand(1, *StreamIoStatus);
+	m_CronusZen.QueueCommand(1, *ChangeSlotA);
+	m_CronusZen.QueueCommand(1, *StreamIoStatus);
+	m_CronusZen.QueueCommand(1, *ChangeSlotB);
+	StreamIoStatus = std::make_unique<StreamIoStatusCommand>((CronusZen::StreamIoStatusMask)(CronusZen::InputReport | CronusZen::OutputReport));
+	m_CronusZen.QueueCommand(1, *StreamIoStatus);
 
-INT_PTR MainDialog::OnCommandDeviceEopPcMobileXbox360(VOID)
-{
-	App->GetCronusZen().SetOutputMode(CronusZen::Xbox360);
-	return TRUE;
-}
-
-INT_PTR MainDialog::OnCommandDeviceEopPlayStation3(VOID)
-{
-	App->GetCronusZen().SetOutputMode(CronusZen::PlayStation3);
-	return TRUE;
-}
-
-INT_PTR MainDialog::OnCommandDeviceEopPlayStation4(VOID)
-{
-	App->GetCronusZen().SetOutputMode(CronusZen::PlayStation4);
-	return TRUE;
-}
-
-INT_PTR MainDialog::OnCommandDeviceEopPlayStation5(VOID)
-{
-	App->GetCronusZen().SetOutputMode(CronusZen::PlayStation5);
-	return TRUE;
-}
-
-INT_PTR MainDialog::OnCommandDeviceEopXboxOne(VOID)
-{
-	App->GetCronusZen().SetOutputMode(CronusZen::XboxOne);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandDevicePs4Specialty(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::TogglePs4Specialty);
+	m_CronusZen.CreateWorkerThread(CronusZen::TogglePs4Specialty);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandDeviceRemotePlay(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::ToggleRemotePlay);
+	m_CronusZen.CreateWorkerThread(CronusZen::ToggleRemotePlay);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandDeviceRefreshAttachedDevices(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::RefreshAttachedDevices);
+	m_CronusZen.CreateWorkerThread(CronusZen::RefreshAttachedDevices);
 	return TRUE;
 }
 
 INT_PTR MainDialog::OnCommandDeviceTurnOffController(VOID)
 {
-	App->GetCronusZen().CreateWorkerThread(CronusZen::TurnOffController);
+	m_CronusZen.CreateWorkerThread(CronusZen::TurnOffController);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopAuto(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::Auto);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopNintendoSwitch(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::NintendoSwitch);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPcMobileXbox360(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::Xbox360);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPlayStation3(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::PlayStation3);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPlayStation4(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::PlayStation4);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopPlayStation5(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::PlayStation5);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceEopXboxOne(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::XboxOne);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceOmNormal(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OperationalMode, CronusZen::GamepadMode);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceOmTournament(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OperationalMode, CronusZen::TournamentMode);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceOmWheel(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::OperationalMode, CronusZen::WheelMode);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceRscDisable(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::RemoteSlot, CronusZen::Disabled);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceRscPSL3(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::RemoteSlot, CronusZen::PS_L3);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandDeviceRscPSShare(VOID)
+{
+	m_CronusZen.SetFragment(CronusZen::RemoteSlot, CronusZen::PS_Share);
 	return TRUE;
 }
 
@@ -418,7 +507,7 @@ INT_PTR MainDialog::OnDeviceChange(CONST WPARAM wParam)
 	// When a device arrives or is removed
 	if (wParam == DBT_DEVICEARRIVAL) {
 		// Attempt to connect when a device arrives to the system
-		App->GetCronusZen().ConnectToDevice();
+		m_CronusZen.ConnectToDevice();
 	}
 
 	return TRUE;
@@ -438,7 +527,7 @@ INT_PTR MainDialog::OnInitDialog(VOID)
 	m_Menu = GetMenu(m_hWnd);
 
 	// Register device change notifications
-	RegisterDeviceNotifications(App->GetCronusZen().GetGUID());
+	RegisterDeviceNotifications(m_CronusZen.GetGUID());
 
 	// Update slots manager information
 	UpdateSlotsData(0, 1);

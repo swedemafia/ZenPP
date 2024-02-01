@@ -34,6 +34,7 @@ public:
 	CONST BOOL CanAdvance(_In_ CONST std::size_t Bytes) CONST;
 	CONST std::size_t Position(VOID) CONST;
 	CONST std::size_t Size(VOID) CONST;
+	CONST std::size_t SizeWithoutHeader(VOID) CONST;
 
 	// Buffer manipulation
 	VOID Advance(_In_ CONST std::size_t Bytes);

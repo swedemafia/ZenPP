@@ -52,6 +52,13 @@ private:
 
 	// 'Device' menu
 	INT_PTR OnCommandDeviceClearBluetoothDevices(VOID);
+	INT_PTR OnCommandDeviceCycleSlots(VOID);
+	INT_PTR OnCommandDevicePs4Specialty(VOID);
+	INT_PTR OnCommandDeviceRefreshAttachedDevices(VOID);
+	INT_PTR OnCommandDeviceRemotePlay(VOID);
+	INT_PTR OnCommandDeviceTurnOffController(VOID);
+
+	// 'Device' -> 'Emulator Output Protocol' submenu
 	INT_PTR OnCommandDeviceEopAuto(VOID);
 	INT_PTR OnCommandDeviceEopNintendoSwitch(VOID);
 	INT_PTR OnCommandDeviceEopPcMobileXbox360(VOID);
@@ -59,10 +66,16 @@ private:
 	INT_PTR OnCommandDeviceEopPlayStation4(VOID);
 	INT_PTR OnCommandDeviceEopPlayStation5(VOID);
 	INT_PTR OnCommandDeviceEopXboxOne(VOID);
-	INT_PTR OnCommandDevicePs4Specialty(VOID);
-	INT_PTR OnCommandDeviceRefreshAttachedDevices(VOID);
-	INT_PTR OnCommandDeviceRemotePlay(VOID);
-	INT_PTR OnCommandDeviceTurnOffController(VOID);
+
+	// 'Device' -> 'Operational Mode' submenu
+	INT_PTR OnCommandDeviceOmNormal(VOID);
+	INT_PTR OnCommandDeviceOmTournament(VOID);
+	INT_PTR OnCommandDeviceOmWheel(VOID);
+
+	// 'Device' -> 'Remote Slot Change' submenu
+	INT_PTR OnCommandDeviceRscDisable(VOID);
+	INT_PTR OnCommandDeviceRscPSL3(VOID);
+	INT_PTR OnCommandDeviceRscPSShare(VOID);
 
 	// 'File' menu
 	INT_PTR OnCommandFileExit(VOID);

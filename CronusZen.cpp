@@ -93,35 +93,80 @@ CONST UCHAR CronusZen::GetWiredDeviceCount(VOID) CONST
 	return m_WiredDevices;
 }
 
-VOID CronusZen::SetConnectionState(CONST ConnectionState& NewState)
+VOID CronusZen::DestroyWorkerThread(VOID)
 {
-	m_ConnectionState = NewState;
+	if (m_WorkerThread != INVALID_HANDLE_VALUE) {
+		TerminateThread(m_WorkerThread, 0);
+		CloseHandle(m_WorkerThread);
+
+		// Invalidate thread handle
+		m_WorkerThread = INVALID_HANDLE_VALUE;
+	}
 }
 
-VOID CronusZen::SetOutputMode(CONST OutputModeList& NewMode)
+VOID CronusZen::SetConnectionState(CONST ConnectionState& NewState)
 {
-	// Do nothing if this output mode is already set
-	if (m_Settings.OutputMode == NewMode)
-		return;
+	// Variable for ease of accessibility
+	HMENU MainDialogMenu = App->GetMainDialog().GetMenuHandle();
 
+	m_ConnectionState = NewState;
+
+	if (m_ConnectionState == Disconnected) {
+		EnableMenuItem(MainDialogMenu, MENU_CONNECTION_DISCONNECT, MF_BYCOMMAND | MF_DISABLED);
+		EnableMenuItem(MainDialogMenu, MENU_CONNECTION_RECONNECT, MF_BYCOMMAND | MF_ENABLED);
+		DestroyWorkerThread();
+	} else {
+		EnableMenuItem(MainDialogMenu, MENU_CONNECTION_DISCONNECT, MF_BYCOMMAND | MF_ENABLED);
+		EnableMenuItem(MainDialogMenu, MENU_CONNECTION_RECONNECT, MF_BYCOMMAND | MF_ENABLED);
+	}
+}
+
+VOID CronusZen::SetFragment(CONST FragmentIDList& Fragment, CONST UCHAR NewValue)
+{
 	// Variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
 
-	// Alert user of the action
-	MainDialog.PrintTimestamp();
-	MainDialog.PrintText(GRAY, L"Attempting to set emulator output protocol to %ws...\r\n", m_OutputMode[NewMode].c_str());
+	switch (Fragment) {
+	case OutputMode:
+		// Terminate the action if the mode is already set
+		if (m_Settings.OutputMode == NewValue)
+			return;
 
-	// Update emulator output protocol
-	m_TargetMode = NewMode;
+		// Alert user to the action being taken
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GRAY, L"Attempting to set output mode to %ws...\r\n", m_OutputMode[NewValue].c_str());
 
-	// Signal we are updating the emulator output protocol
-	m_UpdateOutputProtocol = TRUE;
+		break;
+	case OperationalMode:
+		// Terminate the action if the mode is already set
+		if (m_Settings.OperationalMode == NewValue)
+			return;
 
-	// Build command used to set the desired emulator output protocol 
-	std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ OutputMode, Cfgs, NewMode, 0xff }));
-	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon)));
-	QueueCommand(1, *SendSingleFragment);
-	QueueCommand(1, *StreamIoStatus);
+		// Alert user to the action being taken
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GRAY, L"Attempting to set operational mode to %ws...\r\n", m_OperationalMode[NewValue].c_str());
+
+		break;
+	case RemoteSlot:
+		// Terminate the action if the mode is already set
+		if (m_Settings.RemoteSlot == NewValue)
+			return;
+
+		// Alert user to the action being taken
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GRAY, L"Attempting to set remote slot change to %ws...\r\n", m_RemoteSlot[NewValue].c_str());
+
+		break;
+	}
+
+	// Set target operational mode
+	m_TargetMode = NewValue;
+
+	// Signal we are updating the operational mode
+	m_UpdateFragmentType = Fragment;
+
+	// Create worker thread to handle the update request
+	CreateWorkerThread(CronusZen::UpdateConfig);
 }
 
 VOID CronusZen::CreateWorkerThread(CONST ConnectionState& NewState)
@@ -140,7 +185,7 @@ VOID CronusZen::CreateWorkerThread(CONST ConnectionState& NewState)
 	}
 
 	// Update current connection state
-	m_ConnectionState = NewState;
+	SetConnectionState(NewState);
 
 	// Create the worker thread to handle the operation
 	if ((m_WorkerThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CronusWorkerThreadProc, (LPVOID)this, 0, NULL)) == INVALID_HANDLE_VALUE)
@@ -242,7 +287,24 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 			std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices(new RequestAttachedDevicesCommand);
 
 			// Queue commands to be sent to the device
-			App->GetCronusZen().QueueCommand(1, *RequestAttachedDevices);
+			Cronus->QueueCommand(1, *RequestAttachedDevices);
+
+		} else if (State == SoftReset) {
+			// This block handles a soft reset of the device
+
+			// Notify user of the action
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GRAY, L"Initiating soft reset of your device; please wait...\r\n");
+
+			// Build commands required to soft reset
+			std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+
+			// Queue commands to be sent to the device with a 5-second delay between them
+			Cronus->QueueCommand(1, *StreamIoStatus);
+			Sleep(5000);
+			Cronus->QueueCommand(1, *ResetDevice);
+
 
 		} else if (State == ToggleRemotePlay) {
 			// This block handles toggling PlayStation Remote Play
@@ -261,7 +323,7 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				Cronus->QueueCommand(1, *StreamIoStatus);
 				Cronus->QueueCommand(1, *SendSingleFragment);
 				Cronus->QueueCommand(1, *StreamIoStatus);
-				Cronus->SetOutputMode(Auto);
+				Cronus->SetFragment(OutputMode, Auto);
 				StreamIoStatus = std::make_unique<StreamIoStatusCommand>((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon));
 				Cronus->QueueCommand(1, *StreamIoStatus);
 				Sleep(5000);
@@ -282,7 +344,7 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				Cronus->QueueCommand(1, *StreamIoStatus);
 				Cronus->QueueCommand(1, *SendSingleFragment);
 				Cronus->QueueCommand(1, *StreamIoStatus);
-				Cronus->SetOutputMode(PlayStation4);
+				Cronus->SetFragment(OutputMode, PlayStation4);
 				StreamIoStatus = std::make_unique<StreamIoStatusCommand>((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon));
 				Cronus->QueueCommand(1, *StreamIoStatus);
 				Sleep(5000);
@@ -343,22 +405,6 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				Cronus->QueueCommand(1, *ResetDevice);
 			}
 
-		} else if (State == SoftReset) {
-			// This block handles a soft reset of the device
-
-			// Notify user of the action
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GRAY, L"Initiating soft reset of your device; please wait...\r\n");
-
-			// Build commands required to soft reset
-			std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
-			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
-
-			// Queue commands to be sent to the device with a 5-second delay between them
-			Cronus->QueueCommand(1, *StreamIoStatus);
-			Sleep(5000);
-			Cronus->QueueCommand(1, *ResetDevice);
-
 		} else if (State == TurnOffController) {
 			// This block handles a turning off a connected wireless controller
 
@@ -387,6 +433,26 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 			}
 
 		}
+		else if (State == UpdateConfig) {
+			// This block handles updating the device configuration
+			
+			// Build command used to set the desired emulator output protocol 
+			std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ Cronus->m_UpdateFragmentType, Cfgs, Cronus->m_TargetMode, 0xff }));
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon)));
+			Cronus->QueueCommand(1, *SendSingleFragment);
+			Cronus->QueueCommand(1, *StreamIoStatus);
+
+			// Wait 2 seconds for the device to update
+			Sleep(2000);
+
+			// Check connection state
+			if (Cronus->m_ConnectionState != Connected) {
+				// Alert user of the result
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(ORANGE, L"Update device config may have failed; the device did not respond within the expected timeframe.\r\n");
+			}
+		}
+
 	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Insufficient memory available to execute the worker thread.");
 	} catch (CONST std::wstring& CustomMessage) {
@@ -414,6 +480,9 @@ BOOL CronusZen::OnConnect(VOID)
 
 	// Clear all settings
 	memset(&m_Settings, 0, sizeof(SettingsLayout));
+
+	// Clear last input report
+	memset(&m_LastInputReport, 0, sizeof(InputReportData));
 
 	try {
 		// Query HID device capabilities
@@ -511,6 +580,12 @@ BOOL CronusZen::OnRead(CONST DWORD BytesRead)
 			m_PayloadLength = BytesRemaining; // Set internal payload length used during command processing
 			TotalSize = BytesRemaining + 4;
 
+			if ((ID == CronusZen::INPUTREPORT) && (BytesRemaining == 0x2e)) {
+				TotalSize = 64;
+			} else if ((ID == CronusZen::OUTPUTREPORT) && (BytesRemaining == 0x24)) {
+				TotalSize = 62;
+			}
+
 			//App->GetMainDialog().PrintTimestamp();
 			//App->GetMainDialog().PrintText(RED, L"Bytes remain: %u\r\n", BytesRemaining);
 
@@ -581,6 +656,9 @@ VOID CronusZen::HandleReadCommand(CONST PUCHAR PacketData, CONST std::size_t Pac
 		case GETSTATUS:
 			OnGetStatus();
 			break;
+		case INPUTREPORT:
+			OnInputReport();
+			break;
 		case NAVCONREPORT:
 			OnNavconReport();
 			return;
@@ -597,7 +675,7 @@ VOID CronusZen::HandleReadCommand(CONST PUCHAR PacketData, CONST std::size_t Pac
 
 		return; // Successfully terminate the method
 	} catch (CONST UnexpectedSize& BadData) {
-		App->DisplayError(L"Unrecognized " + BadData.Command + L" command received; got " + std::to_wstring(BadData.Received) + L" bytes and expected at least " + std::to_wstring(BadData.Expected) + L".");
+		App->DisplayError(L"Unrecognized " + BadData.Command + L" command received; got " + std::to_wstring(BadData.Received) + L" bytes and expected at least " + std::to_wstring(BadData.Expected + 4) + L".");
 	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Insufficient memory is available to handle the incoming data.");
 	} catch (CONST std::exception&) {
@@ -787,7 +865,7 @@ VOID CronusZen::OnFragmentRead(VOID)
 
 	if (m_ConnectionState != TogglePs4Specialty && m_ConnectionState != ToggleRemotePlay) {
 		// Restore connection state
-		m_ConnectionState = Connecting;
+		SetConnectionState(Connecting);
 	}
 
 	// Update 'Device' menu items
@@ -806,7 +884,7 @@ VOID CronusZen::OnFragmentRead(VOID)
 VOID CronusZen::OnGetFirmware(VOID)
 {
 	// Ensure the parse buffer contains enough data
-	if (m_ParseBuffer->Size() < 12)
+	if (m_ParseBuffer->SizeWithoutHeader() < 12)
 		throw UnexpectedSize(L"GetFirmware", m_ParseBuffer->Size(), 12);
 
 	// Initialize variable for ease of accessibility
@@ -846,7 +924,7 @@ VOID CronusZen::OnGetFirmware(VOID)
 VOID CronusZen::OnGetSerial(VOID)
 {
 	// Ensure the parse buffer contains enough data for a valid serial number
-	if (m_ParseBuffer->Size() < 32)
+	if (m_ParseBuffer->SizeWithoutHeader() < 32)
 		throw UnexpectedSize(L"GetSerial", m_ParseBuffer->Size(), 32);
 
 	// Extract the serial number from the buffer
@@ -882,7 +960,7 @@ VOID CronusZen::OnGetSerial(VOID)
 VOID CronusZen::OnGetStatus(VOID)
 {
 	// Ensure the parse buffer contains enough data for a valid serial number
-	if (m_ParseBuffer->Size() < sizeof(DeviceStatus))
+	if (m_ParseBuffer->SizeWithoutHeader() < sizeof(DeviceStatus))
 		throw UnexpectedSize(L"GetStatus", m_ParseBuffer->Size(), sizeof(DeviceStatus));
 
 	// Initialize variable for ease of accessibility
@@ -917,6 +995,77 @@ VOID CronusZen::OnGetStatus(VOID)
 	}
 }
 
+// Handle the input report command which includes various input device information
+VOID CronusZen::OnInputReport(VOID)
+{
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// Ensure the parse buffer contains enough data for a valid serial number
+	if (m_ParseBuffer->SizeWithoutHeader() < sizeof(InputReportData))
+		throw UnexpectedSize(L"InputReport", m_ParseBuffer->Size(), sizeof(InputReportData));
+
+	InputReportData InputReport = { };
+
+	// Extract input report
+	m_ParseBuffer->ExtractData(&InputReport, sizeof(InputReportData));
+
+/*
+		USHORT CpuLoadValue;
+		UCHAR SlotValue;
+		UCHAR ConnectedController;
+		UCHAR ConnectedConsole;
+		UCHAR LedState1;
+		UCHAR LedState2;
+		UCHAR LedState3;
+		UCHAR LedState4;
+		UCHAR RumbleValueA;
+		UCHAR RumbleValueB;
+		UCHAR RumbleValueRt;
+		UCHAR RumbleValueLt;
+		UCHAR BatteryValue;
+		UCHAR Input[38];
+		UCHAR Unused[4];
+		UCHAR ReportType;
+		UCHAR VmSpeedValue;
+		USHORT TimestampCounter;
+*/
+	// Check for slot update
+	if (InputReport.SlotValue != m_LastInputReport.SlotValue) {
+		if (InputReport.SlotValue > 0) {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(LIGHTBLUE, L"Now running \'%ws\' from slot #%u.\r\n", App->AnsiToUnicode((PCHAR)m_SlotConfig[InputReport.SlotValue - 1].Title).c_str(), InputReport.SlotValue);
+		}
+		else {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(LIGHTBLUE, L"No slot is currently loaded.\r\n");
+		}
+	}
+
+	// Check for console update
+	if (InputReport.ConnectedConsole != m_LastInputReport.ConnectedConsole) {
+		if (InputReport.ConnectedConsole > 0) {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(LIGHTBLUE, L"Detected a connection to a %ws%ws.\r\n", m_Console[InputReport.ConnectedConsole].c_str(), InputReport.ConnectedConsole < 7 ? L" console" : L"");
+		}
+		else if (!InputReport.ConnectedConsole && m_LastInputReport.ConnectedConsole) {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is no longer connected to a %ws%ws.\r\n", m_Console[InputReport.ConnectedConsole].c_str(), InputReport.ConnectedConsole < 7 ? L" console" : L"");
+		}
+	}
+	
+	// Check for VM speed update
+	if (InputReport.VmSpeedValue != m_LastInputReport.VmSpeedValue) {
+		if (m_LastInputReport.VmSpeedValue > 0) {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is now running at %ums.\r\n", InputReport.VmSpeedValue);
+		}
+	}
+
+	// Copy to last input report
+	memcpy(&m_LastInputReport, &InputReport, sizeof(InputReportData));
+}
+
 // Handle the NavconReport command
 VOID CronusZen::OnNavconReport(VOID)
 {
@@ -936,7 +1085,8 @@ VOID CronusZen::OnNavconReport(VOID)
 		if (m_Settings.Ps4Specialty) {
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GREEN, L"Successfully disabled PS4 Specialty!\r\n");
-		} else {
+		}
+		else {
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GREEN, L"Successfully enabled PS4 Specialty!\r\n");
 		}
@@ -945,7 +1095,8 @@ VOID CronusZen::OnNavconReport(VOID)
 		if (m_Settings.RemotePlay) {
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GREEN, L"Successfully disabled Remote Play!\r\n");
-		} else {
+		}
+		else {
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GREEN, L"Successfully enabled Remote Play!\r\n");
 		}
@@ -956,21 +1107,48 @@ VOID CronusZen::OnNavconReport(VOID)
 		break;
 	}
 
-	// Notify if the emulator output protocol is being changed
-	if (m_UpdateOutputProtocol) {
+	// Handle the config update type
+	switch (m_UpdateFragmentType) {
+	case OutputMode:
 		// Alert user of action
 		MainDialog.PrintTimestamp();
 		MainDialog.PrintText(GREEN, L"Successfully set emulator output protocol to %ws!\r\n", m_OutputMode[m_TargetMode].c_str());
 
 		// Update emulator output protocol
-		m_Settings.OutputMode = m_TargetMode;
+		m_Settings.OutputMode = static_cast<OutputModeList>(m_TargetMode);
 
-		// Reset internal state
-		m_UpdateOutputProtocol = FALSE;
+		break;
 
-		// Update menus
-		MainDialog.UpdateDeviceMenu(m_Settings);
+	case OperationalMode:
+		// Alert user of action
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GREEN, L"Successfully set operational mode to %ws!\r\n", m_OperationalMode[m_TargetMode].c_str());
+
+		// Update emulator output protocol
+		m_Settings.OperationalMode = static_cast<OperationalModeList>(m_TargetMode);
+
+		break;
+
+	case RemoteSlot:
+		// Alert user of action
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GREEN, L"Successfully set remote slot change to %ws!\r\n", m_RemoteSlot[m_TargetMode].c_str());
+
+		// Update emulator output protocol
+		m_Settings.RemoteSlot = static_cast<RemoteSlotChangeList>(m_TargetMode);
+
+		break;
 	}
+
+	if (m_UpdateFragmentType) {
+		// Destroy worker thread as the operation has completed
+		DestroyWorkerThread();
+		// Reset internal state
+		m_UpdateFragmentType = FragmentUnused;
+	}
+
+	// Update menus
+	MainDialog.UpdateDeviceMenu(m_Settings);
 
 	// Set availability of features on the main dialog
 	if (m_ConnectionState != TogglePs4Specialty && m_ConnectionState != ToggleRemotePlay) {
@@ -1085,7 +1263,12 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 		// Re-enable feature availability
 		MainDialog.UpdateFeatureAvailability(TRUE);
 		// Update connection state
-		App->GetCronusZen().SetConnectionState(CronusZen::Connected);
+		SetConnectionState(CronusZen::Connected);
+	}
+
+	if (m_SemanticVersion->IsBeta()) {
+		std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(InputReport));
+		QueueCommand(1, *StreamIoStatus);
 	}
 }
 
@@ -1117,6 +1300,7 @@ VOID CronusZen::OnRequestAttachedDevices(VOID)
 				QueueCommand(1, *RequestAttachedDevices);
 
 				return; // Failure
+
 			} else {
 				// Reset retry counter
 				RequestAttachedDevicesRetry = 0;
@@ -1129,6 +1313,7 @@ VOID CronusZen::OnRequestAttachedDevices(VOID)
 				DisconnectFromDevice();
 
 				return; // Failure
+
 			}
 		} else {
 			RequestAttachedDevicesRetry = 0;
@@ -1191,13 +1376,13 @@ VOID CronusZen::OnRequestAttachedDevices(VOID)
 		// Print message if no wired devices are found
 		if (!m_WiredDevices) {
 			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(YELLOW, L"No wired input devices are detected on your Cronus Zen.\r\n");
+			MainDialog.PrintText(LIGHTBLUE, L"No wired input devices are detected on your Cronus Zen.\r\n");
 		}
 
 		// Print message if no Bluetooth connections are found
 		if (!m_BluetoothDevices) {
 			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(YELLOW, L"No Bluetooth connections are detected on your Cronus Zen.\r\n");
+			MainDialog.PrintText(LIGHTBLUE, L"No Bluetooth connections are detected on your Cronus Zen.\r\n");
 		}
 	}
 
@@ -1295,8 +1480,10 @@ VOID CronusZen::QueueCommand(CONST UCHAR Count, CommandBase& Command)
 	}
 }
 
+// Method for sending the initial communication upon connecting to the device
 VOID CronusZen::SendInitialCommunication(VOID)
 {
+	// Build the initial communication command sequence
 	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
 	std::unique_ptr<ExitApiModeCommand> ExitApiMode(new ExitApiModeCommand);
 	std::unique_ptr<UnloadGpcCommand> UnloadGpc(new UnloadGpcCommand);
@@ -1308,6 +1495,7 @@ VOID CronusZen::SendInitialCommunication(VOID)
 	App->GetMainDialog().PrintTimestamp();
 	App->GetMainDialog().PrintText(GRAY, L"Initiating communication with the Cronus Zen...\r\n");
 
+	// Queue commands to be sent to the device
 	QueueCommand(1, *StreamIoStatus);
 	QueueCommand(1, *ExitApiMode);
 	QueueCommand(1, *UnloadGpc);

@@ -57,6 +57,10 @@ BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 
 VOID HidDeviceBase::DisconnectFromDevice(VOID)
 {
+	// Initialize variables for ease of accessibility
+	CronusZen& CronusZen = App->GetCronusZen();
+	MainDialog& MainDialog = App->GetMainDialog();
+
 	// Close out the IOCP
 	CancelIocp();
 
@@ -64,10 +68,10 @@ VOID HidDeviceBase::DisconnectFromDevice(VOID)
 	if (m_Device.get()) {
 		// If the app is being terminated, no need to inform the user of the disconnection
 		if (!App->IsQuitting() && (m_Device->GetHandle() != INVALID_HANDLE_VALUE)) {
-			App->GetMainDialog().PrintTimestamp();
-			App->GetMainDialog().PrintText(RED, L"The connection to the Cronus Zen has been terminated.\r\n");
-			App->GetMainDialog().UpdateSlotsData(0, 1);
-			App->GetMainDialog().UpdateFeatureAvailability(FALSE);
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(RED, L"The connection to the Cronus Zen has been terminated.\r\n");
+			MainDialog.UpdateSlotsData(0, 1);
+			MainDialog.UpdateFeatureAvailability(FALSE);
 		}
 		m_Device->Close();
 		m_Device.reset();
@@ -76,26 +80,28 @@ VOID HidDeviceBase::DisconnectFromDevice(VOID)
 	// Suspend thread
 	SuspendThread(GetIocpThreadHandle());
 
-	if (App->GetCronusZen().GetConnectionState() == CronusZen::Connected) {
+	if (CronusZen.GetConnectionState() == CronusZen::Connected) {
 		// Update device state
-		App->GetCronusZen().SetConnectionState(CronusZen::Disconnected);
+		CronusZen.SetConnectionState(CronusZen::Disconnected);
 	}
 }
 
 // Method for scanning and calling to open a connection to the device
 VOID HidDeviceBase::ConnectToDevice(VOID)
 {
-	static int counter = 0;
+	// Initialize variables for ease of accessibility
+	CronusZen& CronusZen = App->GetCronusZen();
+	MainDialog& MainDialog = App->GetMainDialog();
 
 	// Query the target device
 	if (FindDevice() && !m_Device.get()) {
 		// Notify user that the device has been located
-		App->GetMainDialog().PrintTimestamp();
-		App->GetMainDialog().PrintText(GRAY, L"Attempting to connect to your Cronus Zen...\r\n");
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GRAY, L"Attempting to connect to your Cronus Zen...\r\n");
 
-		if (App->GetCronusZen().GetConnectionState() == CronusZen::Disconnected) {
+		if (CronusZen.GetConnectionState() == CronusZen::Disconnected) {
 			// Update device state
-			App->GetCronusZen().SetConnectionState(CronusZen::Connecting);
+			CronusZen.SetConnectionState(CronusZen::Connecting);
 		}
 
 		try {

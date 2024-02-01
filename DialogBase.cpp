@@ -1,7 +1,8 @@
 #include "Precomp.h"
 
 // Constructor for DialogBase, initializing instance
-DialogBase::DialogBase()
+DialogBase::DialogBase() :
+	m_CronusZen(App->GetCronusZen())
 {
 	m_Instance = App->GetInstance();
 }
