@@ -168,9 +168,6 @@ VOID CronusZen::CreateWorkerThread(CONST ConnectionState& NewState)
 	// Variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
 
-	// Set focus back to RichEdit
-	SetFocus(MainDialog.GetRichEditHwnd());
-
 	// Verify that an operation is not already executing
 	if (m_WorkerThread != INVALID_HANDLE_VALUE) {
 		MainDialog.PrintTimestamp();
@@ -200,21 +197,21 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 		CONST ConnectionState& State = Cronus->GetConnectionState();
 		MainDialog& MainDialog = App->GetMainDialog();
 
-		// Disable features on the main dialog
-		MainDialog.UpdateFeatureAvailability(FALSE);
-
 		// Handle device state specific actions
-		if (State == ClearBluetooth) {
+		if (State == ClearBluetooth && (MessageBox(MainDialog.GetHwnd(), L"Proceeding will clear all registered Bluetooth devices on your Cronus Zen.\r\n\r\nNOTICE: To ensure your Bluetooth device does not reconnect to your Cronus Zen, pair it with another host device (such as a gaming console or PC, etc.).\r\n\r\nDo you wish to proceed?", L"Clear Registered Bluetooth Devices", MB_ICONQUESTION | MB_YESNO) == IDYES)) {
 			// This block handles clearing registered Bluetooth devices
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			// Notify user of the action
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GRAY, L"Initiating Bluetooth device cleanup; please wait...\r\n");
 
 			// Build commands required to perform a clearing of registered Bluetooth devices
-			std::unique_ptr<ClearBluetoothCommand> ClearBluetooth(new ClearBluetoothCommand);
-			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
-			std::unique_ptr<TurnOffControllerCommand> TurnOffController(new TurnOffControllerCommand);
+			std::unique_ptr<ClearBluetoothCommand> ClearBluetooth = std::make_unique<ClearBluetoothCommand>();
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+			std::unique_ptr<TurnOffControllerCommand> TurnOffController = std::make_unique<TurnOffControllerCommand>();
 
 			// Queue commands to be sent to the device
 			Cronus->QueueCommand(1, *StreamIoStatus);
@@ -225,36 +222,42 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 			StreamIoStatus = std::make_unique<StreamIoStatusCommand>((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon));
 			Cronus->QueueCommand(1, *StreamIoStatus);
 
-		} else if (State == DeviceCleanup) {
+		} else if (State == DeviceCleanup && (MessageBox(MainDialog.GetHwnd(), L"Proceeding will erase all memory slots on your Cronus Zen.\r\n\r\nNOTICE: This will erase all scripts and/or gamepacks that are programmed on your Cronus Zen.\r\n\r\nDo you wish to proceed?", L"Device Cleanup", MB_ICONQUESTION | MB_YESNO) == IDYES)) {
 			// This block handles performing a device cleanup
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			// Notify user of the action
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GRAY, L"Initiating cleanup of your device; please wait...\r\n");
 
 			// Build commands required to perform a device cleanup
-			std::unique_ptr<DeviceCleanupCommand> DeviceCleanup(new DeviceCleanupCommand);
-			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+			std::unique_ptr<DeviceCleanupCommand> DeviceCleanup = std::make_unique<DeviceCleanupCommand>();
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
 
 			// Queue commands to be sent to the device with an 5-second delay between them
 			Cronus->QueueCommand(1, *StreamIoStatus);
 			Cronus->QueueCommand(1, *StreamIoStatus);
 			Cronus->QueueCommand(1, *DeviceCleanup);
-			Sleep(5000);
+			Sleep(5500);
 			StreamIoStatus = std::make_unique<StreamIoStatusCommand>((CronusZen::StreamIoStatusMask)(InputReport | OutputReport | Mouse | Keyboard | Navcon));
 			Cronus->QueueCommand(1, *StreamIoStatus);
 
-		} else if (State == FactoryReset) {
+		} else if (State == FactoryReset && (MessageBox(MainDialog.GetHwnd(), L"Proceeding will perform a factory reset of your Cronus Zen.\r\n\r\nNOTICE: This will erase all scripts and/or gamepacks that are programmed on your Cronus Zen as well as resetting the device to factory defaults.\r\n\r\nDo you wish to proceed?", L"Factory Reset", MB_ICONQUESTION | MB_YESNO) == IDYES)) {
 			// This block handles performing a factory reset
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			// Notify user of the action
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GRAY, L"Initiating factory reset of your device; please wait...\r\n");
 
 			// Build commands required to perform a factory reset
-			std::unique_ptr<FactoryResetCommand> FactoryReset(new FactoryResetCommand);
-			std::unique_ptr<RequestMkFileCommand> RequestMkFile(new RequestMkFileCommand);
-			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+			std::unique_ptr<FactoryResetCommand> FactoryReset = std::make_unique<FactoryResetCommand>();
+			std::unique_ptr<RequestMkFileCommand> RequestMkFile = std::make_unique<RequestMkFileCommand>();
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
 
 			// Queue commands to be sent to the device with an 8-second delay between them
 			Cronus->QueueCommand(1, *StreamIoStatus);
@@ -264,9 +267,12 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 			Cronus->QueueCommand(1, *StreamIoStatus);
 			Cronus->QueueCommand(1, *RequestMkFile);
 
-		} else if (State == RefreshAttachedDevices) {
+		}
+		else if (State == RefreshAttachedDevices) {
 			// This block handles refreshing attached devices
-			
+
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			// Notify user of the action
 			MainDialog.PrintTimestamp();
@@ -278,21 +284,47 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 			MainDialog.UpdateFeatureAvailability(TRUE);
 
 			// Build commands required to request attached devices
-			std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices(new RequestAttachedDevicesCommand);
+			std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices = std::make_unique<RequestAttachedDevicesCommand>();
 
 			// Queue commands to be sent to the device
 			Cronus->QueueCommand(1, *RequestAttachedDevices);
 
+		} else if (State == ProgramDevice) {
+			// This block handles programming the device
+			
+			// Disable features on the main dialog and reset slots manager caption
+			MainDialog.UpdateSlotsData(0, 0);
+			MainDialog.UpdateFeatureAvailability(FALSE);
+
+			// Build commands required for programming to the device
+			std::unique_ptr<DeviceCleanupCommand> DeviceCleanup = std::make_unique<DeviceCleanupCommand>();
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GRAY, L"Initiating cleanup of your device; please wait...\r\n");
+
+			// Queue commands to be sent to the device
+			Cronus->QueueCommand(1, *StreamIoStatus);
+			Cronus->QueueCommand(1, *DeviceCleanup);
+			Sleep(5500);
+			Cronus->SetConnectionState(ProgramDevice);
+
+			// Begin process
+			Cronus->FlashNextConfig();
+
 		} else if (State == SoftReset) {
 			// This block handles a soft reset of the device
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			// Notify user of the action
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(GRAY, L"Initiating soft reset of your device; please wait...\r\n");
 
 			// Build commands required to soft reset
-			std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
-			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+			std::unique_ptr<ResetDeviceCommand> ResetDevice = std::make_unique<ResetDeviceCommand>();
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
 
 			// Queue commands to be sent to the device with a 5-second delay between them
 			Cronus->QueueCommand(1, *StreamIoStatus);
@@ -302,16 +334,22 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 
 		} else if (State == ToggleRemotePlay) {
 			// This block handles toggling PlayStation Remote Play
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			if (Cronus->m_Settings.RemotePlay) {
 				// Notify user of the action
 				MainDialog.PrintTimestamp();
 				MainDialog.PrintText(GRAY, L"Attempting to disable Remote Play...\r\n");
 
+				// Build the fragment
+				CONST CronusZen::FragmentData Fragment = { RemotePlay, Cfgs, FALSE, 0xff };
+
 				// Build commands required to disable Remote Play
-				std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
-				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
-				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ RemotePlay, Cfgs, FALSE, 0xff }));
+				std::unique_ptr<ResetDeviceCommand> ResetDevice = std::make_unique<ResetDeviceCommand>();
+				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment = std::make_unique<SendSingleFragmentCommand>(Fragment);
 
 				// Queue commands to be sent to the device
 				Cronus->QueueCommand(1, *StreamIoStatus);
@@ -329,10 +367,13 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				MainDialog.PrintTimestamp();
 				MainDialog.PrintText(GRAY, L"Attempting to enable Remote Play...\r\n");
 
+				// Build the fragment
+				CONST CronusZen::FragmentData Fragment = { RemotePlay, Cfgs, TRUE, 0xff };
+
 				// Build commands required to enable Remote Play
-				std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
-				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
-				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ RemotePlay, Cfgs, TRUE, 0xff }));
+				std::unique_ptr<ResetDeviceCommand> ResetDevice = std::make_unique<ResetDeviceCommand>();
+				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment = std::make_unique<SendSingleFragmentCommand>(Fragment);
 
 				// Queue commands to be sent to the device
 				Cronus->QueueCommand(1, *StreamIoStatus);
@@ -349,6 +390,9 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 
 		} else if (State == TogglePs4Specialty) {
 			// This block handles toggling the PS4 Specialty feature
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			if (Cronus->m_Settings.Ps4Specialty) {
 				// PS4 Specialty is currently enabled, so let us disable it
@@ -357,10 +401,13 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				MainDialog.PrintTimestamp();
 				MainDialog.PrintText(GRAY, L"Attempting to disable PS4 Specialty...\r\n");
 
+				// Build the fragment
+				CONST CronusZen::FragmentData Fragment = { Ps4Specialty, Cfgs, FALSE, 0xff };
+
 				// Build commands required to disable PS4 Specialty
-				std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
-				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ Ps4Specialty, Cfgs, FALSE, 0xff }));
-				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+				std::unique_ptr<ResetDeviceCommand> ResetDevice = std::make_unique<ResetDeviceCommand>();
+				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment = std::make_unique<SendSingleFragmentCommand>(Fragment);
 
 				// Queue commands to be sent to the device
 				Cronus->QueueCommand(1, *StreamIoStatus);
@@ -379,10 +426,13 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				MainDialog.PrintTimestamp();
 				MainDialog.PrintText(GRAY, L"Attempting to enable PS4 Specialty...\r\n");
 
-				// Build commands required to enable PS4 Specialty
-				std::unique_ptr<ResetDeviceCommand> ResetDevice(new ResetDeviceCommand);
-				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ Ps4Specialty, Cfgs, TRUE, 0xff }));
-				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+				// Build the fragment
+				CONST CronusZen::FragmentData Fragment = { Ps4Specialty, Cfgs, TRUE, 0xff };
+
+				// Build commands required to disable PS4 Specialty
+				std::unique_ptr<ResetDeviceCommand> ResetDevice = std::make_unique<ResetDeviceCommand>();
+				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+				std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment = std::make_unique<SendSingleFragmentCommand>(Fragment);
 
 				// Queue commands to be sent to the device
 				Cronus->QueueCommand(1, *StreamIoStatus);
@@ -401,6 +451,9 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 
 		} else if (State == TurnOffController) {
 			// This block handles a turning off a connected wireless controller
+			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
 
 			// Check if a wireless controller is present
 			if (Cronus->GetBluetoothDeviceCount()) {
@@ -409,8 +462,8 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 				MainDialog.PrintText(GRAY, L"Requesting to turn off wireless controller; please wait...\r\n");
 
 				// Build commands required to turn off the controller
-				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
-				std::unique_ptr<TurnOffControllerCommand> TurnOffController(new TurnOffControllerCommand);
+				std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+				std::unique_ptr<TurnOffControllerCommand> TurnOffController = std::make_unique<TurnOffControllerCommand>();
 
 				// Queue commands to be sent to the device
 				Cronus->QueueCommand(1, *StreamIoStatus);
@@ -430,9 +483,15 @@ DWORD CronusZen::CronusWorkerThreadProc(LPVOID Parameter)
 		else if (State == UpdateConfig) {
 			// This block handles updating the device configuration
 			
+			// Disable features on the main dialog
+			MainDialog.UpdateFeatureAvailability(FALSE);
+
+			// Build the fragment
+			CONST CronusZen::FragmentData Fragment = { Cronus->m_UpdateFragmentType, Cfgs, Cronus->m_TargetMode, 0xff };
+			
 			// Build command used to set the desired emulator output protocol 
-			std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment(new SendSingleFragmentCommand({ Cronus->m_UpdateFragmentType, Cfgs, Cronus->m_TargetMode, 0xff }));
-			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon)));
+			std::unique_ptr<SendSingleFragmentCommand> SendSingleFragment = std::make_unique<SendSingleFragmentCommand>(Fragment);
+			std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>((CronusZen::StreamIoStatusMask)(InputReport | Mouse | Keyboard | Navcon));
 			Cronus->QueueCommand(1, *SendSingleFragment);
 			Cronus->QueueCommand(1, *StreamIoStatus);
 
@@ -477,6 +536,9 @@ BOOL CronusZen::OnConnect(VOID)
 
 	// Clear last input report
 	memset(&m_LastInputReport, 0, sizeof(InputReportData));
+
+	// Set blank semantic version
+	m_SemanticVersion = std::make_unique<SemanticVersion>("0.0.0");
 
 	try {
 		// Query HID device capabilities
@@ -588,11 +650,11 @@ BOOL CronusZen::OnRead(CONST DWORD BytesRead)
 
 			// Handle a single-packet case
 			if ((Count == 1) && (ID != CronusZen::REQUESTATTACHEDDEVICES)) {
-				m_PreparseBuffer->InsertData(&m_ReceiveBuffer.get()[1], TotalSize);
-				BytesRemaining = 0; // All of the data received
-			}
-			else {
-				// Handle first chunk of a multi-packet command
+				// READBYTECODE likes to signal a count of 1 despite being many packets, so handle this accordingly
+				m_PreparseBuffer->InsertData(&m_ReceiveBuffer.get()[1], TotalSize > 64 ? (BytesRemaining - TotalSize > 0 ? 60 : 64) : TotalSize);
+				BytesRemaining = TotalSize < 64 ? 0 : TotalSize - (BytesRemaining - TotalSize > 0 ? 60 : 64);
+			} else {
+				// Handle first chunk of a multi-packet REQUESTATTACHEDDEVICES command
 				m_PreparseBuffer->InsertData(&m_ReceiveBuffer.get()[1], 64);
 				BytesRemaining -= 60; // Update remaining bytes of data required
 			}
@@ -609,11 +671,14 @@ BOOL CronusZen::OnRead(CONST DWORD BytesRead)
 		if (!BytesRemaining) {
 			//DumpHex(m_PreparseBuffer->Buffer(), m_PreparseBuffer->Size());
 			HandleReadCommand(m_PreparseBuffer->Buffer(), m_PreparseBuffer->Size());
+			
 		}
 
 		return TRUE; // Signal success
 	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Insufficient memory is available to handle the incoming data.");
+	} catch (...) {
+		App->DisplayError(L"Unhandled exception caught during handling the incoming data.");
 	}
 
 	DisconnectFromDevice(); // Disconnect from device as an exception was caught
@@ -656,6 +721,9 @@ VOID CronusZen::HandleReadCommand(CONST PUCHAR PacketData, CONST std::size_t Pac
 		case NAVCONREPORT:
 			OnNavconReport();
 			return;
+		case READBYTECODE:
+			OnReadByteCode();
+			return;
 		case READSLOTSCFG:
 			OnReadSlotsCfg();
 			break;
@@ -668,12 +736,15 @@ VOID CronusZen::HandleReadCommand(CONST PUCHAR PacketData, CONST std::size_t Pac
 		}
 
 		return; // Successfully terminate the method
+
 	} catch (CONST UnexpectedSize& BadData) {
 		App->DisplayError(L"Unrecognized " + BadData.Command + L" command received; got " + std::to_wstring(BadData.Received) + L" bytes and expected at least " + std::to_wstring(BadData.Expected + 4) + L".");
 	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Insufficient memory is available to handle the incoming data.");
 	} catch (CONST std::exception&) {
 		App->DisplayError(L"A buffer overrun was reached during HandleReadCommand.");
+	} catch (...) {
+		App->DisplayError(L"Unhandled exception caught during HandleReadCommand.");
 	}
 
 	DisconnectFromDevice(); // Disconnect from device as an exception was caught
@@ -696,7 +767,7 @@ VOID CronusZen::OnExclusionListRead(VOID)
 			// Retry fragment read command and notify user
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(ORANGE, L"Retrying exclusion list read (retry attempt %u of 3)...\r\n", ExclusionListReadRetry);
-			std::unique_ptr<ExclusionListReadCommand> ExclusionListRead(new ExclusionListReadCommand);
+			std::unique_ptr<ExclusionListReadCommand> ExclusionListRead = std::make_unique<ExclusionListReadCommand>();
 			QueueCommand(1, *ExclusionListRead);
 			return;
 		} else {
@@ -722,7 +793,7 @@ VOID CronusZen::OnExclusionListRead(VOID)
 	MainDialog.PrintText(GRAY, L"Requesting device configuration...\r\n");
 
 	// Prepare fragment read command
-	std::unique_ptr<FragmentReadCommand> FragmentRead(new FragmentReadCommand);
+	std::unique_ptr<FragmentReadCommand> FragmentRead = std::make_unique<FragmentReadCommand>();
 	QueueCommand(1, *FragmentRead);
 }
 
@@ -747,7 +818,7 @@ VOID CronusZen::OnFragmentRead(VOID)
 			// Retry fragment read command; notify user
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(ORANGE, L"Retrying fragment read (retry attempt %u of 3)...\r\n", FragmentRetry);
-			std::unique_ptr<FragmentReadCommand> FragmentRead(new FragmentReadCommand);
+			std::unique_ptr<FragmentReadCommand> FragmentRead = std::make_unique<FragmentReadCommand>();
 			QueueCommand(1, *FragmentRead);
 			return;
 		} else {
@@ -870,7 +941,7 @@ VOID CronusZen::OnFragmentRead(VOID)
 	MainDialog.PrintText(GRAY, L"Requesting mouse and keyboard settings...\r\n");
 	
 	// Initialize next command and queue it for being sent to the device
-	std::unique_ptr<RequestMkFileCommand> RequestMkFile(new RequestMkFileCommand);
+	std::unique_ptr<RequestMkFileCommand> RequestMkFile = std::make_unique<RequestMkFileCommand>();
 	QueueCommand(1, *RequestMkFile);
 }
 
@@ -878,8 +949,8 @@ VOID CronusZen::OnFragmentRead(VOID)
 VOID CronusZen::OnGetFirmware(VOID)
 {
 	// Ensure the parse buffer contains enough data
-	if (m_ParseBuffer->SizeWithoutHeader() < 12)
-		throw UnexpectedSize(L"GetFirmware", m_ParseBuffer->Size(), 12);
+	if (m_ParseBuffer->SizeWithoutHeader() < 10)
+		throw UnexpectedSize(L"GetFirmware", m_ParseBuffer->Size(), 10);
 
 	// Initialize variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
@@ -907,7 +978,7 @@ VOID CronusZen::OnGetFirmware(VOID)
 		MainDialog.PrintTimestamp();
 		MainDialog.PrintText(ORANGE, L"Certain features are unavailable with this firmware version.\r\n");
 		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(PINK, L"Full appplication functionality requires a firmware modification.\r\n");
+		MainDialog.PrintText(PINK, L"Full application functionality requires a firmware modification.\r\n");
 		MainDialog.PrintTimestamp();
 		MainDialog.PrintText(PINK, L"Go to \'Firmware\' > \'Install Compatible Firmware\' for instructions.\r\n", m_Firmware.c_str());
 		MainDialog.DisplaySupportInfo();
@@ -945,7 +1016,7 @@ VOID CronusZen::OnGetSerial(VOID)
 	}
 
 	// Send next command
-	std::unique_ptr<ExclusionListReadCommand> ExclusionListRead(new ExclusionListReadCommand);
+	std::unique_ptr<ExclusionListReadCommand> ExclusionListRead = std::make_unique<ExclusionListReadCommand>();
 	QueueCommand(1, *ExclusionListRead);
 
 }
@@ -961,18 +1032,71 @@ VOID CronusZen::OnGetStatus(VOID)
 	MainDialog& MainDialog = App->GetMainDialog();
 
 	// Allocate DeviceStatus structure
-	std::unique_ptr<DeviceStatus> Status(new DeviceStatus);
+	std::unique_ptr<DeviceStatus> Status = std::make_unique<DeviceStatus>();
 
 	// Extract DeviceStatus structure from the read command
 	m_ParseBuffer->ExtractData(Status.get(), sizeof(DeviceStatus));
 
-	if (Status->Error) {
+	//if (Status->Error) {
 		// TODO: display some sort of error message here
-		return;
-	}
+	//	return;
+	//}
 
 	// Determine next step based on the command the status was requested for
 	switch (Status->Command) {
+	case CronusZen::FLASHCONFIG:
+
+		for (unsigned i = 0; i < 8; i++) {
+			if (m_SlotConfig[i].MustFlashConfig) {
+				// Mark slot as config being flashed
+				m_SlotConfig[i].MustFlashConfig = FALSE;
+
+				// Check for success
+				if (!Status->Error) {
+					// Alert user of action
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(GREEN, L"Successfully flashed config for slot #%u!\r\n", i + 1);
+				} else {
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(RED, L"The Cronus Zen rejected the request to flash the config for slot #%u!\r\n", i + 1);
+				}
+
+				// Program the script to the slot
+				FlashNextGamepack();
+
+				return;
+			}
+		}
+
+		break;
+
+	case CronusZen::FLASHGAMEPACK:
+
+		for (unsigned i = 0; i < 8; i++) {
+			if (m_SlotConfig[i].MustFlashGamepack) {
+				// Mark slot as script being flashed
+				m_SlotConfig[i].MustFlashGamepack = FALSE;
+
+				// Check for success
+				if (!Status->Error) {
+					// Alert user of action
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(GREEN, L"Successfully flashed script to slot #%u!\r\n", i + 1);
+				}
+				else {
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(RED, L"The Cronus Zen rejected the request to flash the script to slot #%u!\r\n", i + 1);
+				}
+
+				// Program the script to the slot
+				FlashNextConfig();
+
+				return;
+			}
+		}
+
+		break;
+
 	case CronusZen::REQUESTMKFILE:
 
 		if (m_ConnectionState != TogglePs4Specialty && m_ConnectionState != ToggleRemotePlay) {
@@ -981,11 +1105,36 @@ VOID CronusZen::OnGetStatus(VOID)
 			MainDialog.PrintText(GRAY, L"Requesting attached devices and Bluetooth connections...\r\n");
 		}
 
-		// Build command to request attached devices
-		std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices(new RequestAttachedDevicesCommand);
+		// Queue command to request attached devices
+		std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices = std::make_unique<RequestAttachedDevicesCommand>();
 		QueueCommand(1, *RequestAttachedDevices);
 
 		break;
+	}
+}
+
+VOID CronusZen::CheckByteCodeFiles(VOID)
+{
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// Request byte code if we are on beta firmware
+	if (m_SemanticVersion->IsBeta()) {
+		// Iterate through until we found a slot that we need the byte code from
+		for (unsigned i = 0; i < 8; i++) {
+			// Check if the byte code needs to be read
+			if (m_SlotConfig[i].NeedByteCode) {
+				// Alert user to action taken
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(GRAY, L"Requesting byte code from slot #%u...\r\n", i + 1);
+
+				// Create the ReadByteCode command and queue it to be sent to the device
+				std::unique_ptr<ReadByteCodeCommand> ReadByteCode = std::make_unique<ReadByteCodeCommand>(i);
+				QueueCommand(1, *ReadByteCode);
+
+				break;
+			}
+		}
 	}
 }
 
@@ -1001,58 +1150,47 @@ VOID CronusZen::OnInputReport(VOID)
 
 	InputReportData InputReport = { };
 
-	// Extract input report
-	m_ParseBuffer->ExtractData(&InputReport, sizeof(InputReportData));
+	// Determine if we need to check for byte code if we are just connecting
+	if (m_ConnectionState == Connecting) {
+		// Update connection state
+		SetConnectionState(Connected);
+		// Check for needing to pull byte code
+		CheckByteCodeFiles();
 
-/*
-		USHORT CpuLoadValue;
-		UCHAR SlotValue;
-		UCHAR ConnectedController;
-		UCHAR ConnectedConsole;
-		UCHAR LedState1;
-		UCHAR LedState2;
-		UCHAR LedState3;
-		UCHAR LedState4;
-		UCHAR RumbleValueA;
-		UCHAR RumbleValueB;
-		UCHAR RumbleValueRt;
-		UCHAR RumbleValueLt;
-		UCHAR BatteryValue;
-		UCHAR Input[38];
-		UCHAR Unused[4];
-		UCHAR ReportType;
-		UCHAR VmSpeedValue;
-		USHORT TimestampCounter;
-*/
-	// Check for slot update
-	if (InputReport.SlotValue != m_LastInputReport.SlotValue) {
-		if (InputReport.SlotValue > 0) {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(LIGHTBLUE, L"Now running \'%ws\' from slot #%u.\r\n", App->AnsiToUnicode((PCHAR)m_SlotConfig[InputReport.SlotValue - 1].Title).c_str(), InputReport.SlotValue);
-		}
-		else {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(LIGHTBLUE, L"No slot is currently loaded.\r\n");
-		}
-	}
+	} else {
+		// Extract input report
+		m_ParseBuffer->ExtractData(&InputReport, sizeof(InputReportData));
 
-	// Check for console update
-	if (InputReport.ConnectedConsole != m_LastInputReport.ConnectedConsole) {
-		if (InputReport.ConnectedConsole > 0) {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(LIGHTBLUE, L"Detected a connection to a %ws%ws.\r\n", m_Console[InputReport.ConnectedConsole].c_str(), InputReport.ConnectedConsole < 7 ? L" console" : L"");
+		// Check for slot update
+		if (InputReport.SlotValue != m_LastInputReport.SlotValue) {
+			if (InputReport.SlotValue > 0) {
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(LIGHTBLUE, L"Now running \'%ws\' from slot #%u.\r\n", App->AnsiToUnicode((PCHAR)m_SlotConfigData[InputReport.SlotValue - 1].Title).c_str(), InputReport.SlotValue);
+			}
+			else {
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(LIGHTBLUE, L"No slot is currently loaded.\r\n");
+			}
 		}
-		else if (!InputReport.ConnectedConsole && m_LastInputReport.ConnectedConsole) {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is no longer connected to a %ws%ws.\r\n", m_Console[InputReport.ConnectedConsole].c_str(), InputReport.ConnectedConsole < 7 ? L" console" : L"");
+
+		// Check for console update
+		if (InputReport.ConnectedConsole != m_LastInputReport.ConnectedConsole) {
+			if (InputReport.ConnectedConsole && InputReport.ConnectedConsole < 7) {
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(LIGHTBLUE, L"Last detected connection was to a %ws%ws.\r\n", m_Console[InputReport.ConnectedConsole].c_str(), InputReport.ConnectedConsole < 7 ? L" console" : L"");
+			}
+			else if (!InputReport.ConnectedConsole && m_LastInputReport.ConnectedConsole) {
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is no longer connected to a %ws%ws.\r\n", m_Console[m_LastInputReport.ConnectedConsole].c_str(), InputReport.ConnectedConsole < 7 ? L" console" : L"");
+			}
 		}
-	}
-	
-	// Check for VM speed update
-	if (InputReport.VmSpeedValue != m_LastInputReport.VmSpeedValue) {
-		if (m_LastInputReport.VmSpeedValue > 0) {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is now running at %ums.\r\n", InputReport.VmSpeedValue);
+
+		// Check for VM speed update
+		if (InputReport.VmSpeedValue != m_LastInputReport.VmSpeedValue) {
+			if (m_LastInputReport.VmSpeedValue > 0) {
+				MainDialog.PrintTimestamp();
+				MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is now operating at %ums.\r\n", InputReport.VmSpeedValue);
+			}
 		}
 	}
 
@@ -1076,24 +1214,12 @@ VOID CronusZen::OnNavconReport(VOID)
 		MainDialog.PrintText(GREEN, L"Successfully erased all memory slots on your Cronus Zen!\r\n");
 		break;
 	case TogglePs4Specialty:
-		if (m_Settings.Ps4Specialty) {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GREEN, L"Successfully disabled PS4 Specialty!\r\n");
-		}
-		else {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GREEN, L"Successfully enabled PS4 Specialty!\r\n");
-		}
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GREEN, L"Successfully %ws PS4 Specialty!\r\n", m_Settings.Ps4Specialty ? L"disabled" : L"enabled");
 		break;
 	case ToggleRemotePlay:
-		if (m_Settings.RemotePlay) {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GREEN, L"Successfully disabled Remote Play!\r\n");
-		}
-		else {
-			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GREEN, L"Successfully enabled Remote Play!\r\n");
-		}
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GREEN, L"Successfully %ws Remote Play!\r\n", m_Settings.RemotePlay ? L"disabled" : L"enabled");
 		break;
 	case TurnOffController:
 		MainDialog.PrintTimestamp();
@@ -1145,7 +1271,12 @@ VOID CronusZen::OnNavconReport(VOID)
 	MainDialog.UpdateDeviceMenu(m_Settings);
 
 	// Set availability of features on the main dialog
-	if (m_ConnectionState != TogglePs4Specialty && m_ConnectionState != ToggleRemotePlay) {
+	if (m_ConnectionState == DeviceCleanup) {
+		// Request slots config
+		std::unique_ptr<ReadSlotsCfgCommand> ReadSlotsCfg = std::make_unique<ReadSlotsCfgCommand>();
+		QueueCommand(1, *ReadSlotsCfg);
+
+	} else if (m_ConnectionState != TogglePs4Specialty && m_ConnectionState != ToggleRemotePlay) {
 		// Ignore when toggling Ps4 Specialty and Remote Play
 		MainDialog.UpdateFeatureAvailability(TRUE);
 		// Reset connection state
@@ -1156,8 +1287,89 @@ VOID CronusZen::OnNavconReport(VOID)
 	}
 
 	// Reset IO stream
-	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(Off));
+	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(Off);
 	QueueCommand(1, *StreamIoStatus);
+}
+
+// Handle the ReadByteCode command for handling byte code and writing to a file
+VOID CronusZen::OnReadByteCode(VOID)
+{
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// Variable for determining which slot the byte code belongs to
+	UINT ByteCodeSlot = 0;
+	USHORT ByteCodeExpectedLength = 0;
+	USHORT ByteCodeReturnedLength = m_PayloadLength;
+
+	// Find the first slot that needs the byte code and store it's identifier
+	for (unsigned i = 0; i < 8; i++) {
+		if (m_SlotConfig[i].NeedByteCode) {
+			ByteCodeSlot = i;
+			break;
+		}
+	}
+
+	// Mark slot as no longer needed
+	m_SlotConfig[ByteCodeSlot].NeedByteCode = FALSE;
+
+	// Retrieve the expected byte code length
+	ByteCodeExpectedLength = m_SlotConfig[ByteCodeSlot].Config.ByteCodeLength - 1;
+
+	// Check the length of the data returned against what it should be
+	if (ByteCodeReturnedLength == ByteCodeExpectedLength) {
+		// Obtain a copt of the Unicode version of the slot title
+		std::wstring UnicodeTitle = App->AnsiToUnicode((CONST PCHAR)m_SlotConfig[ByteCodeSlot].Config.Title);
+
+		// Alert the user of the action being taken
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(GREEN, L"Successfully read byte code for \'%ws\' from slot #%u!\r\n", UnicodeTitle.c_str(), ByteCodeSlot + 1);
+
+		// Create File object to write the byte code
+		std::unique_ptr<File> OutputBinFile = std::make_unique<File>(m_SlotConfig[ByteCodeSlot].ByteCodeFilePath, GENERIC_WRITE, FILE_SHARE_WRITE, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, FALSE);
+
+		// Attempt to open the file
+		if (!OutputBinFile->Open()) {
+			// Alert user of the failure
+			App->DisplayError(L"An error occured while preparing the file for writing the byte code from slot #" + std::to_wstring(ByteCodeSlot + 1) + L" to " + m_SlotConfig[ByteCodeSlot].ByteCodeFilePath);
+		} else {
+			// Attempt to write the byte code to the file
+			if (!OutputBinFile->Write(m_PreparseBuffer->Buffer() + 4, ByteCodeExpectedLength, NULL, NULL)) {
+				App->DisplayError(L"An error occured while writing the byte code for slot #" + std::to_wstring(ByteCodeSlot + 1) + L" to " + m_SlotConfig[ByteCodeSlot].ByteCodeFilePath);
+			}
+
+			// Close the file
+			OutputBinFile->Close();
+		}
+
+	} else {
+		// Alert the user of the unexpected amount of data returned
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"An error occured while retrieving the byte code from slot #%u (got %u bytes and expected %u)!\r\n", ByteCodeSlot + 1, ByteCodeReturnedLength, ByteCodeExpectedLength);
+	
+		// Notify about slot #8 error
+		if ((ByteCodeSlot == 7) && !ByteCodeReturnedLength) {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(PINK, L"The Cronus Zen device has a known issue where the device refuses to return the byte code from slot #8.\r\n");
+			MainDialog.DisplaySupportInfo();
+		}
+	}
+
+	// Check if another slot needs it's byte code read
+	for (unsigned i = ByteCodeSlot; i < 8; i++) {
+		// Check if the slot requires a byte code download
+		if (m_SlotConfig[i].NeedByteCode) {
+			// Alert user to action taken
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GRAY, L"Requesting byte code from slot #%u...\r\n", i + 1);
+
+			// Create ReadByteCode command and queue it to be sent to the device
+			std::unique_ptr<ReadByteCodeCommand> ReadByteCode = std::make_unique<ReadByteCodeCommand>(i);
+			QueueCommand(1, *ReadByteCode);
+
+			break;
+		}
+	}
 }
 
 // Handle the ReadSlotsCfg command for processing slot data
@@ -1169,9 +1381,19 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 	// Initialize variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
 
-	// Notify user that the slots configuration is being processed
-	MainDialog.PrintTimestamp();
-	MainDialog.PrintText(TEAL, L"Processing slots configuration data...\r\n");
+	// Clear listbox
+	MainDialog.ListBoxClear();
+
+	if (m_ConnectionState != DeviceCleanup) {
+		// Notify user that the slots configuration is being processed
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(TEAL, L"Processing slots configuration data...\r\n");
+	} else {
+		// Allow features to be used again
+		MainDialog.UpdateFeatureAvailability(TRUE);
+		// Reset connection state
+		SetConnectionState(Connected);
+	}
 
 	// Validate length of slots config and retry if necessary
 	// - Ensures that the received slots config data is the expected size (4064 bytes)
@@ -1183,7 +1405,7 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 			MainDialog.PrintText(ORANGE, L"Retrying read slots config (retry attempt %u of 3)...\r\n", ReadSlotsCfgRetry);
 
 			// Create read slots config command object
-			std::unique_ptr<ReadSlotsCfgCommand> ReadSlotsCfg(new ReadSlotsCfgCommand);
+			std::unique_ptr<ReadSlotsCfgCommand> ReadSlotsCfg = std::make_unique<ReadSlotsCfgCommand>();
 
 			// Send the read slots config command
 			QueueCommand(1, *ReadSlotsCfg);
@@ -1207,32 +1429,107 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 	}
 
 	// Allocate slots config data
-	m_SlotConfig = std::make_unique<SlotConfigData[]>(8);
+	m_SlotConfig = std::make_unique<SlotConfig[]>(8);
+	m_SlotConfigData = std::make_unique<SlotConfigData[]>(8);
 
 	// Extract slots config data
-	m_ParseBuffer->ExtractData(m_SlotConfig.get(), 8 * sizeof(SlotConfigData));
+	m_ParseBuffer->ExtractData(m_SlotConfigData.get(), 8 * sizeof(SlotConfigData));
 
-	// Initialize variables used to track slot usage and storage
-	UCHAR TotalSlots = 0;
+	// Create the "SlotData" directory and handle any access/elevation required errors
+	if (!CreateDirectory(L"SlotData", NULL))
+		App->HandleCreateDirectoryError(L"SlotData");
+
+	// Initialize variable used to track slot usage and storage space
 	UINT TotalBytes = 0;
+
+	// Reset number of slots used
+	m_SlotsUsed = 0;
 
 	// Iterate through all 8 slots to gather usage information
 	for (unsigned i = 0; i < 8; i++) {
 		// Get bytecode length for the current slot
-		UINT ByteCodeLength = m_SlotConfig[i].ByteCodeLength;
+		BOOLEAN IsScript = (m_SlotConfigData[i].GamepackID == 0xffff);
+		INT ByteCodeLength = m_SlotConfigData[i].ByteCodeLength;
 
 		// If the slot is occupied (bytecode length is non-zero)
-		if (ByteCodeLength--) {
+		if (--ByteCodeLength > 0) {
+			// Check for converting .gpc to .bin (scripts only)
+			if (IsScript) {
+				// Convert extension to .bin or add it if it isn't there
+				*(PULONG)(m_SlotConfigData[i].Title + strlen((CONST PCHAR)m_SlotConfigData[i].Title) - 4) = 'nib.';
+			}
+
+			// Convert slot title to Unicode for display purposes
+			std::wstring UnicodeTitle = App->AnsiToUnicode((CONST PCHAR)m_SlotConfigData[i].Title);
+
 			// Print information about the slot's contents
 			MainDialog.PrintTimestamp();
 			MainDialog.PrintText(YELLOW, L"Slot #%u has %ws \'%ws\' using %u bytes.\r\n",
-				m_SlotConfig[i].Slot - 0x2f,
-				m_SlotConfig[i].GamepackID == 0xffff ? L"script" : L"gamepack",
-				App->AnsiToUnicode((CONST PCHAR)m_SlotConfig[i].Title).c_str(),
+				m_SlotConfigData[i].Slot - 0x2f,
+				m_SlotConfigData[i].GamepackID == 0xffff ? L"script" : L"gamepack",
+				UnicodeTitle.c_str(),
 				ByteCodeLength);
 
+			// Insert item to main dialog list box
+			MainDialog::ListBoxItem* ListBoxItem = new MainDialog::ListBoxItem{ NULL };
+			ListBoxItem->IsBeingDeleted = FALSE;
+			ListBoxItem->GamepackID = m_SlotConfigData[i].GamepackID;
+			ListBoxItem->Slot = m_SlotConfigData[i].Slot - 0x30;
+			wcscpy_s(ListBoxItem->Title, UnicodeTitle.c_str());
+
+			// Check for byte code file (.bin) if slot is a script
+			if (IsScript) {
+				// Generate slot data path
+				std::wstring SlotDirectory = L"SlotData\\Slot" + std::to_wstring(ListBoxItem->Slot + 1);
+
+				// Create the "SlotData" directory and handle any access/elevation required errors
+				if (!CreateDirectory(SlotDirectory.c_str(), NULL))
+					App->HandleCreateDirectoryError(SlotDirectory);
+
+				// Set the file paths for the byte code and config file
+				m_SlotConfig[i].ByteCodeFile = UnicodeTitle;
+				m_SlotConfig[i].ByteCodeFilePath = SlotDirectory + L"\\" + UnicodeTitle;
+				m_SlotConfig[i].ConfigFilePath = m_SlotConfig[i].ByteCodeFilePath;
+				m_SlotConfig[i].ConfigFilePath.replace(m_SlotConfig[i].ConfigFilePath.size() - 3, 3, L"dat");
+
+				// Set the config data
+				memcpy(&m_SlotConfig[i].Config, &m_SlotConfigData[i], sizeof(SlotConfigData));
+
+				// Set initial flags in the event of programming
+				m_SlotConfig[i].MustFlashConfig = TRUE;
+				m_SlotConfig[i].MustFlashGamepack = TRUE;
+
+				// Include additional attributes such as byte code length and path to file
+				ListBoxItem->ByteCodeLength = ByteCodeLength;
+				ListBoxItem->Path = m_SlotConfig[i].ByteCodeFilePath;
+
+				std::unique_ptr<File> FileExists = std::make_unique<File>(m_SlotConfig[i].ByteCodeFilePath);
+
+				// Check if file exists, if not, mark it for requesting the byte code
+				if (!FileExists->Exists()) {
+					m_SlotConfig[i].NeedByteCode = TRUE;
+				}
+
+				// Create File object to dump config
+				std::unique_ptr<File> ConfigFilePath = std::make_unique<File>(m_SlotConfig[i].ConfigFilePath, GENERIC_WRITE, FILE_SHARE_WRITE, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, FALSE);
+
+				// Attempt to open the slot config file for writing
+				if (!ConfigFilePath->Open()) {
+					App->DisplayError(L"An error occured while opening the config file for slot #" + std::to_wstring(i + 1));
+				}
+				else {
+					// Attempt to write to the slot config file
+					if (!ConfigFilePath->Write(&m_SlotConfigData[i], sizeof(SlotConfigData), NULL, NULL)) {
+						App->DisplayError(L"An error occured while writing the config file for slot #" + std::to_wstring(i + 1));
+					}
+				}
+			}
+
+			// Add item to listbox
+			MainDialog.ListBoxAdd(ListBoxItem);
+
 			// Update total slot and byte counts
-			TotalSlots++;
+			m_SlotsUsed++;
 			TotalBytes += ByteCodeLength;
 		}
 	}
@@ -1245,24 +1542,28 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 	} else {
 		// Print slots usage information
 		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(YELLOW, L"%u slot%ws using %u bytes of storage with %u bytes of storage available.\r\n", TotalSlots, TotalSlots > 1 ? L"s" : L"", TotalBytes, 262136 - TotalBytes);
+		MainDialog.PrintText(YELLOW, L"%u slot%ws using %u bytes of storage with %u bytes of storage available.\r\n", m_SlotsUsed, m_SlotsUsed > 1 ? L"s" : L"", TotalBytes, 262136 - TotalBytes);
 	}
 
 	// Update main window
-	MainDialog.UpdateSlotsData(TotalSlots, TotalBytes);
+	MainDialog.UpdateSlotsData(m_SlotsUsed, TotalBytes);
 
 	if (m_ConnectionState == TogglePs4Specialty || m_ConnectionState == ToggleRemotePlay) {
 		CreateWorkerThread(CronusZen::RefreshAttachedDevices);
 	} else {
-		// Re-enable feature availability
-		MainDialog.UpdateFeatureAvailability(TRUE);
-		// Update connection state
-		SetConnectionState(CronusZen::Connected);
+		MainDialog.UpdateFeatureAvailability(m_SemanticVersion->IsBeta());
 	}
 
+	// Currently we can only process input reports on beta firmware
 	if (m_SemanticVersion->IsBeta()) {
-		std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(InputReport));
+		std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(InputReport);
 		QueueCommand(1, *StreamIoStatus);
+	} else {
+		MessageBox(MainDialog.GetHwnd(), L"Certain features are unavailable with this firmware version.\r\n\r\nFull application functionality requires a firmware modification.\r\n\r\nGo to \'Firmware\' > \'Install Compatible Firmware\' for instructions.", L"Warning: Incompatible Firmware", MB_ICONHAND | MB_OK);
+	}
+
+	if (m_ConnectionState == ProgramDevice) {
+		CheckByteCodeFiles();
 	}
 }
 
@@ -1290,7 +1591,7 @@ VOID CronusZen::OnRequestAttachedDevices(VOID)
 				MainDialog.PrintText(ORANGE, L"Retrying request attached devices (retry attempt %u of 3)...\r\n", RequestAttachedDevicesRetry);
 
 				// Allocate and queue the RequestAttachedDevices command
-				std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices(new RequestAttachedDevicesCommand);
+				std::unique_ptr<RequestAttachedDevicesCommand> RequestAttachedDevices = std::make_unique<RequestAttachedDevicesCommand>();
 				QueueCommand(1, *RequestAttachedDevices);
 
 				return; // Failure
@@ -1386,7 +1687,7 @@ VOID CronusZen::OnRequestAttachedDevices(VOID)
 		MainDialog.PrintTimestamp();
 		MainDialog.PrintText(GRAY, L"Requesting slots configuration...\r\n");
 
-		std::unique_ptr<ReadSlotsCfgCommand> ReadSlotsCfg(new ReadSlotsCfgCommand);
+		std::unique_ptr<ReadSlotsCfgCommand> ReadSlotsCfg = std::make_unique<ReadSlotsCfgCommand>();
 		QueueCommand(1, *ReadSlotsCfg);
 	}
 }
@@ -1399,8 +1700,13 @@ VOID CronusZen::OnRequestMkFile(VOID)
 
 	// Check if this command was a result of a factory reset and notify the user
 	if (m_ConnectionState == FactoryReset) {
+		// Alert user of the action
 		MainDialog.PrintTimestamp();
 		MainDialog.PrintText(GREEN, L"Successfully factory reset your Cronus Zen!\r\n");
+		
+		// Clear slots list
+		MainDialog.ListBoxClear();
+
 		// Use StreamIoStatusMask 0x1d
 		// Cronus->QueueCommand(1, *StreamIoStatus);
 	}
@@ -1431,7 +1737,7 @@ VOID CronusZen::OnRequestMkFile(VOID)
 	}
 
 	// Allocate and queue the GetStatus command
-	std::unique_ptr<GetStatusCommand> GetStatus(new GetStatusCommand);
+	std::unique_ptr<GetStatusCommand> GetStatus = std::make_unique<GetStatusCommand>();
 	QueueCommand(1, *GetStatus);
 }
 
@@ -1474,16 +1780,43 @@ VOID CronusZen::QueueCommand(CONST UCHAR Count, CommandBase& Command)
 	}
 }
 
+VOID CronusZen::QueueCommand(CONST UCHAR Count, CONST USHORT Size, CommandBase& Command)
+{
+	// Create a temporary buffer to hold the outgoing command structure
+	PUCHAR OutgoingCommand = new UCHAR[65]{ 0 };
+
+	// Copy the commands header (null-byte followed by packet identifier)
+	memcpy(OutgoingCommand, Command.Buffer(), 2);
+
+	// Set the command's size (excluding the header)
+	*(PUSHORT)&OutgoingCommand[2] = Size;
+
+	// Set the command count
+	*(PBYTE)&OutgoingCommand[4] = Count;
+
+	// Copy the remaining command data (excluding the header)
+	memcpy(&OutgoingCommand[5], Command.Buffer() + 2, Command.Size() - 2);
+
+	// Add packet to queue
+	m_Queue.push_back(OutgoingCommand);
+
+	// Check if command is the only item in queue
+	if (m_Queue.size() == 1) {
+		// If queue was empty, write command immediately
+		AsynchronousWrite(OutgoingCommand);
+	}
+}
+
 // Method for sending the initial communication upon connecting to the device
 VOID CronusZen::SendInitialCommunication(VOID)
 {
 	// Build the initial communication command sequence
-	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
-	std::unique_ptr<ExitApiModeCommand> ExitApiMode(new ExitApiModeCommand);
-	std::unique_ptr<UnloadGpcCommand> UnloadGpc(new UnloadGpcCommand);
-	std::unique_ptr<CircleTestCommand> CircleTest(new CircleTestCommand(0, 0, 0));
-	std::unique_ptr<GetFirmwareCommand> GetFirmware(new GetFirmwareCommand);
-	std::unique_ptr<GetSerialCommand> GetSerial(new GetSerialCommand);
+	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
+	std::unique_ptr<ExitApiModeCommand> ExitApiMode = std::make_unique<ExitApiModeCommand>();
+	std::unique_ptr<UnloadGpcCommand> UnloadGpc = std::make_unique<UnloadGpcCommand>();
+	std::unique_ptr<CircleTestCommand> CircleTest = std::make_unique<CircleTestCommand>(0, 0, 0);
+	std::unique_ptr<GetFirmwareCommand> GetFirmware = std::make_unique<GetFirmwareCommand>();
+	std::unique_ptr<GetSerialCommand> GetSerial = std::make_unique<GetSerialCommand>();
 
 	// Notify user of the state of the connection
 	App->GetMainDialog().PrintTimestamp();
@@ -1496,4 +1829,357 @@ VOID CronusZen::SendInitialCommunication(VOID)
 	QueueCommand(1, *CircleTest);
 	QueueCommand(1, *GetFirmware);
 	QueueCommand(1, *GetSerial);
+}
+
+// Method used for adding a script to be programmed to the device
+VOID CronusZen::SlotsAdd(VOID)
+{
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// Initialize other required variables
+	OPENFILENAME OpenFileName = { NULL };
+	WCHAR FilePath[MAX_PATH] = { NULL };
+
+	// Build our OPENFILENAME struct
+	OpenFileName.lStructSize = sizeof(OPENFILENAME);
+	OpenFileName.hwndOwner = MainDialog.GetHwnd();
+	OpenFileName.lpstrFile = FilePath;
+	OpenFileName.nMaxFile = MAX_PATH;
+	OpenFileName.lpstrFilter = L"Compiled Scripts (*.bin)\0*.bin\0";
+	OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_FILEMUSTEXIST | OFN_DONTADDTORECENT | OFN_NOCHANGEDIR;
+
+	// Open the dialog and capture the file the user selects
+	if (GetOpenFileName(&OpenFileName)) {
+
+		// TODO: check for file size exceeding limit of the Cronus Zen
+		
+		// Initialize variables used for processing the incoming file
+		MainDialog::ListBoxItem* ListBoxItem = new MainDialog::ListBoxItem{ NULL };
+		std::wstring StrFilePath = FilePath;
+		std::size_t LastSlash = StrFilePath.rfind(L"\\");
+		UCHAR SlotToWrite = 0;
+
+		// Loop through and find the first available slot
+		for (unsigned i = 0; i < 8; i++) {
+			if (!m_SlotConfig[i].ByteCodeFilePath.size()) {
+				SlotToWrite = i;
+				break;
+			}
+		}
+
+		// Prepare listbox item
+		ListBoxItem->IsBeingProgrammed = TRUE;
+		ListBoxItem->GamepackID = 0xffff; // Script (.bin file)
+		ListBoxItem->Path = StrFilePath;
+		ListBoxItem->Slot = SlotToWrite;
+
+		// Check if a backslash was found
+		if (LastSlash != std::wstring::npos)
+			StrFilePath = StrFilePath.substr(LastSlash + 1);
+
+		// Set the listbox item title
+		wcscpy_s(ListBoxItem->Title, StrFilePath.substr(0, 47).c_str());
+
+		// Ensure that the file ends in ".bin"
+		if (_wcsicmp(ListBoxItem->Title + wcslen(ListBoxItem->Title) - 4, L".bin")) {
+			wcscat_s(ListBoxItem->Title, 52, L".bin");
+		}
+
+		// Insert into listbox
+		MainDialog.ListBoxAdd(ListBoxItem);
+
+		// Update internal slots config for programming
+		m_SlotConfig[SlotToWrite].ByteCodeFile = StrFilePath;
+		m_SlotConfig[SlotToWrite].ByteCodeFilePath = ListBoxItem->Path;
+		m_SlotConfig[SlotToWrite].ConfigFilePath = L"";
+		m_SlotConfig[SlotToWrite].NeedByteCode = FALSE;
+		m_SlotConfig[SlotToWrite].MustFlashConfig = TRUE;
+		m_SlotConfig[SlotToWrite].MustFlashGamepack = TRUE;
+		memset(&m_SlotConfig[SlotToWrite].Config, 0, sizeof(SlotConfigData));
+
+		m_SlotsUsed++;
+	}
+}
+
+// Method used to initialize programming slots to the device
+VOID CronusZen::SlotsProgram(VOID)
+{
+	CreateWorkerThread(ProgramDevice);
+}
+
+// Method used for flashing the slot config file
+VOID CronusZen::FlashNextConfig(VOID)
+{
+	// Variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// Initialize required variables
+	const UCHAR Unknown3[44] = {
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+		0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13,
+		0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d,
+		0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+		0x28, 0x29, 0x2a, 0x2b
+	};
+	SlotConfigData FlashConfigData = { NULL };
+	USHORT FlashConfigFileSize = 0;
+
+	for (unsigned i = 0; i < 8; i++) {
+		if (m_SlotConfig[i].MustFlashConfig) {
+			// Alert user of the action being taken
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GRAY, L"Attempting to flash config on slot #%u for %ws...\r\n", i + 1, m_SlotConfig[i].ByteCodeFile.c_str());
+
+			try {
+				std::unique_ptr<File> ScriptFile = std::make_unique<File>(m_SlotConfig[i].ByteCodeFilePath);
+
+				// Attempt to open the script (.bin) file
+				if (!ScriptFile->Open(GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, TRUE))
+					throw std::wstring(L"An error occured reading " + m_SlotConfig[i].ByteCodeFilePath + L".");
+
+				// Get the file size
+				FlashConfigFileSize = static_cast<USHORT>(ScriptFile->GetFileSize() + 1);
+
+				// Check if the config exists or not, if not, create our own config data
+				
+				// Create File object for reading config file
+				std::unique_ptr<File> ConfigFile = std::make_unique<File>(m_SlotConfig[i].ConfigFilePath, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, FALSE);
+
+				if (ConfigFile->Exists()) {
+					// Alert user to action
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(YELLOW, L"Attempting to use existing config for this script from its previous slot...\r\n");
+
+					if (ConfigFile->Open()) {
+						if (!ConfigFile->Read(&FlashConfigData, sizeof(SlotConfigData), NULL, NULL))
+							throw std::wstring(L"An error occured reading the file data of the config data for " + m_SlotConfig[i].ConfigFilePath + L".");
+					} else {
+						throw std::wstring(L"An error occured reading the file data of the config data for " + m_SlotConfig[i].ConfigFilePath + L".");
+					}
+
+				} else {
+					// Initialize variables used for the flash config command
+					std::string AnsiTitle = App->UnicodeToAnsi(m_SlotConfig[i].ByteCodeFile).substr(0, 51);
+
+					// Ensure there's a null-terminator so we don't run into any long name issues
+					AnsiTitle.push_back('\0');
+
+					// Build the flash config command
+					FlashConfigData.GamepackID = 0xffff;
+					FlashConfigData.Flags = 1 + (32 | 2);
+					FlashConfigData.ByteCodeLength = FlashConfigFileSize;
+					memcpy(&FlashConfigData.Unknown3, Unknown3, 44);
+					strcpy_s((PCHAR)FlashConfigData.Title, AnsiTitle.size(), AnsiTitle.c_str());
+				}
+				/*
+				if (m_SlotConfig[i].ConfigFilePath.empty()) {
+					// Initialize variables used for the flash config command
+					std::string AnsiTitle = App->UnicodeToAnsi(m_SlotConfig[i].ByteCodeFile).substr(0, 52);
+
+					// Ensure there's a null-terminator so we don't run into any long name issues
+					AnsiTitle.push_back('\0');
+
+					// Build the flash config command
+					FlashConfigData.GamepackID = 0xffff;
+					FlashConfigData.Flags = 1 + (32 | 2);
+					FlashConfigData.ByteCodeLength = FlashConfigFileSize;
+					memcpy(&FlashConfigData.Unknown3, Unknown3, 44);
+					strcpy_s((PCHAR)FlashConfigData.Title, AnsiTitle.size(), AnsiTitle.c_str());
+				}
+				else {
+					// Alert user to action
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(YELLOW, L"Attempting to use existing config for this script from slot #%u...\r\n", i + 1);
+
+					// Create File object for reading config file
+					std::unique_ptr<File> ConfigFile(new File(m_SlotConfig[i].ConfigFilePath, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, FALSE));
+
+					if (!ConfigFile->Open())
+						throw std::wstring(L"An error occured reading " + m_SlotConfig[i].ConfigFilePath + L".");
+
+					if (!ConfigFile->Read(&FlashConfigData, sizeof(SlotConfigData), NULL, NULL))
+						throw std::wstring(L"An error occured reading the file data of the config data for " + m_SlotConfig[i].ConfigFilePath + L".");
+				}
+				*/
+				// Ensure the slot is correct
+				FlashConfigData.Slot = 0x30 + i;
+
+				// Initialize a variable to hold the config data for inserting across each command packet
+				UCHAR Config[508] = { 0 };
+				memcpy(&Config, &FlashConfigData, 508);
+
+				// Queue flash config command
+				for (unsigned i = 0; i < 8; i++) {
+					std::unique_ptr<FlashConfigCommand> FlashConfig = std::make_unique<FlashConfigCommand>();
+					FlashConfig->InsertData(Config + i * 60, 60);
+					QueueCommand(i == 0 ? 1 : 0, 508, *FlashConfig);
+				}
+
+				// Queue the remainder of the config
+				std::unique_ptr<FlashConfigCommand> FlashConfig = std::make_unique<FlashConfigCommand>();
+				UCHAR EmptyData[32] = { 0 };
+				FlashConfig->InsertData(Config + 480, 28);
+				QueueCommand(0, 508, *FlashConfig);
+
+				// Get status
+				std::unique_ptr<GetStatusCommand> GetStatus = std::make_unique<GetStatusCommand>();
+				QueueCommand(1, *GetStatus);
+
+				return;
+
+			} catch (CONST std::bad_alloc&) {
+				App->DisplayError(L"Insufficient memory available while attempting to flash the config for " + m_SlotConfig[i].ByteCodeFilePath + L".");
+			} catch (CONST std::wstring& CustomMessage) {
+				App->DisplayError(CustomMessage);
+			}
+		}
+	}
+
+	// Enable features on the main dialog
+	MainDialog.UpdateFeatureAvailability(TRUE);
+
+	// Send checksum to affirm the flash
+	std::unique_ptr<ClCommand> Cl = std::make_unique<ClCommand>();
+	Cl->InsertByte(m_Checksum[0]);
+	Cl->InsertByte(m_Checksum[1]);
+	Cl->InsertByte(m_Checksum[2]);
+	Cl->InsertByte(m_Checksum[3]);
+
+	// Insert random data
+	for (unsigned i = 0; i < 56; i++)
+		Cl->InsertByte(rand() % 256);
+
+	// Queue command
+	QueueCommand(1, *Cl);
+
+	// Queue command to read slots config
+	std::unique_ptr<ReadSlotsCfgCommand> ReadSlotsCfg = std::make_unique<ReadSlotsCfgCommand>();
+	QueueCommand(1, *ReadSlotsCfg);
+}
+
+// Method used for flashing the script to the slot
+VOID CronusZen::FlashNextGamepack(VOID)
+{
+	// Variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	for (unsigned i = 0; i < 8; i++) {
+		if (m_SlotConfig[i].MustFlashGamepack) {
+			// Alert user of the action being taken
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(GRAY, L"Attempting to flash slot #%u with file %ws...\r\n", i + 1, m_SlotConfig[i].ByteCodeFile.c_str());
+
+			try {
+				std::unique_ptr<File> ScriptFile = std::make_unique<File>(m_SlotConfig[i].ByteCodeFilePath);
+
+				// Attempt to open the script (.bin) file
+				if (!ScriptFile->Open(GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, TRUE))
+					throw std::wstring(L"An error occured reading " + m_SlotConfig[i].ByteCodeFilePath + L".");
+
+				// Initialize a variable to store the file size
+				USHORT ScriptFileSize = static_cast<USHORT>(ScriptFile->GetFileSize());
+
+				// Allocate a buffer to hold the file data
+				std::unique_ptr<UCHAR[]> ScriptFileData(new UCHAR[ScriptFileSize]{ 0 });
+
+				// Attempt to read the file data
+				if (!ScriptFile->Read(ScriptFileData.get(), ScriptFileSize, NULL, NULL))
+					throw std::wstring(L"An error occured reading the file data for " + m_SlotConfig[i].ByteCodeFile + L".");
+
+				// Initialize variables required
+				std::unique_ptr<UCHAR[]> PaddingData(new UCHAR[60]{ 0 });
+				USHORT BytesSent = 0;
+
+				while (BytesSent != ScriptFileSize) {
+					// Create our flash gamepack command object
+					std::unique_ptr<FlashGamepackCommand> FlashGamepack = std::make_unique<FlashGamepackCommand>();
+
+					if (!BytesSent) {
+						// Insert slot number for the first packet
+						FlashGamepack->InsertByte(0x30 + i);
+
+						if (ScriptFileSize > 59) {
+							// Insert first chunk
+							FlashGamepack->InsertData(ScriptFileData.get(), 59);
+
+							// Increase number of bytes sent
+							BytesSent += 59;
+
+							// Store the last data sent for the potential required padding
+							*(PUCHAR)PaddingData.get() = 0x30 + i;
+							memcpy(&PaddingData[1], ScriptFileData.get(), 59);
+
+						}
+						else {
+							// Insert next chunk
+							FlashGamepack->InsertData(ScriptFileData.get(), ScriptFileSize);
+
+							// Increase number of bytes sent
+							BytesSent += ScriptFileSize;
+						}
+					} else if (ScriptFileSize - BytesSent < 60) {
+						// Insert the remaining file data and apply the padding
+						FlashGamepack->InsertData(ScriptFileData.get() + BytesSent, ScriptFileSize - BytesSent);
+						FlashGamepack->InsertData(PaddingData.get() + ScriptFileSize - BytesSent, 60 - (ScriptFileSize - BytesSent));
+
+						// Increase number of bytes sent
+						BytesSent += (ScriptFileSize - BytesSent);
+
+					} else {
+						// Copy padding data
+						memcpy(PaddingData.get(), ScriptFileData.get() + BytesSent, 60);
+
+						// Insert the next 60 bytes of the file dat
+						FlashGamepack->InsertData(ScriptFileData.get() + BytesSent, 60);
+
+						// Increase number of bytes sent
+						BytesSent += 60;
+					}
+
+					// Queue the command
+					QueueCommand(BytesSent <= 60 ? 1 : 0, ScriptFileSize + 1, *FlashGamepack);
+				}
+
+				// Request status
+				std::unique_ptr<GetStatusCommand> GetStatus = std::make_unique<GetStatusCommand>();
+				QueueCommand(1, *GetStatus);
+
+			}
+			catch (CONST std::bad_alloc&) {
+				App->DisplayError(L"Insufficient memory available while attempting to flash " + m_SlotConfig[i].ByteCodeFilePath + L".");
+			} catch (CONST std::wstring& CustomMessage) {
+				App->DisplayError(CustomMessage);
+			}
+
+			break;
+		}
+	}
+}
+
+// Method used for marking a slot for deletion and advancing the following slots a position forwards
+VOID CronusZen::SlotsRemove(_In_ CONST UINT Slot)
+{
+	// Clear the slot
+	memset(&m_SlotConfig[Slot], 0, sizeof(SlotConfig));
+
+	// Consolidate any open slots
+	for (unsigned i = Slot, j = Slot + 1; j < 8; j++) {
+		if (m_SlotConfig[i].ByteCodeFile.empty() && !m_SlotConfig[j].ByteCodeFile.empty()) {
+			memcpy(&m_SlotConfig[i], &m_SlotConfig[j], sizeof(SlotConfig));
+			memset(&m_SlotConfig[j], 0, sizeof(SlotConfig));
+			j--;
+		} else {
+			i++;
+		}
+	}
+
+	// Reduce number of slots used
+	m_SlotsUsed--;
+}
+
+// Method used to return the number of slots used
+CONST UCHAR CronusZen::SlotsUsed(VOID) CONST
+{
+	return m_SlotsUsed;
 }

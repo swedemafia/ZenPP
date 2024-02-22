@@ -2,6 +2,7 @@
 // Microsoft Visual C++ generated include file.
 // Used by Zen++.rc
 //
+#define DIALOG_CODE                     9
 #define ACCELERATOR_ZENPP               100
 #define MENU_RICHEDIT_POPUP             110
 #define FILE_ZPPUPDATER                 117
@@ -10,6 +11,7 @@
 #define BITMAP_FIRMWARE_STEP2           121
 #define FILE_FIRMWARE_COMPATIBLE        122
 #define FILE_FIRMWARE_LATEST            123
+#define MENU_LISTBOX_POPUP              124
 #define ICON_ZENPP                      200
 #define DIALOG_MAIN                     300
 #define DIALOG_ABOUT                    301
@@ -25,6 +27,9 @@
 #define BUTTON_FIRMWARE_BACK            1017
 #define LABEL_FIRMWARE_STEP             1018
 #define EDIT_FIRMWARE_DESCRIPTORS       1019
+#define RICHEDIT_CODE_INPUT             1020
+#define IDC_RICHEDIT22                  1021
+#define RICHEDIT_CODE_OUTPUT            1021
 #define LABEL_ABOUT_HEADER              1100
 #define LABEL_ABOUT_VERSIONINFO         1101
 #define LIST_MAIN_SLOTS                 1200
@@ -57,23 +62,39 @@
 #define MENU_DEVICE_REMOTEPLAY          40106
 #define MENU_DEVICE_TURNOFFCONTROLLER   40107
 #define MENU_DEVICE_PS4SPECIALTY        40108
+#define ID_POPUP_MOVEUP                 40108
 #define MENU_DEVICE_REFRESHATTACHEDDEVICES 40109
+#define ID_POPUP_MOVEUP40109            40109
 #define MENU_DEVICE_EOP_AUTO            40110
+#define ID_POPUP_EXPORT                 40110
 #define MENU_DEVICE_EOP_NINTENDOSWITCH  40111
+#define ID_POPUP_EXPORTCONFIGTO         40111
 #define MENU_DEVICE_EOP_PLAYSTATION3    40112
+#define ID_POPUP_IMPORTCONFIG           40112
 #define MENU_DEVICE_EOP_PLAYSTATION4    40113
+#define ID_POPUP_REMOVE                 40113
 #define MENU_DEVICE_EOP_PLAYSTATION5    40114
+#define MENU_LISTBOX_POPUP_REMOVE       40114
 #define MENU_DEVICE_EOP_PCMOBILEXBOX360 40115
+#define MENU_LISTBOX_POPUP_MOVEDOWN     40115
 #define MENU_DEVICE_EOP_XBOXONEX        40116
+#define MENU_LISTBOX_POPUP_MOVEUP       40116
 #define MENU_DEVICE_OM_NORMAL           40117
+#define MENU_LISTBOX_POPUP_EXPORTBIN    40117
 #define MENU_DEVICE_OM_TOURNAMENT       40118
+#define MENU_LISTBOX_POPUP_EXPORTCONFIG 40118
 #define MENU_DEVICE_OM_WHEEL            40119
+#define MENU_LISTBOX_POPUP_IMPORTCONFIG 40119
 #define MENU_DEVICE_RSC_DISABLED        40120
+#define MENU_LISTBOX_POPUP_EXPORTSETTINGS 40120
 #define MENU_DEVICE_RSC_PSL3            40121
+#define MENU_LISTBOX_POPUP_IMPORTSETTINGS 40121
 #define MENU_DEVICE_RSC_PSSHARE         40122
 #define MENU_FILE_EXIT                  40123
+#define MENU_VIEW_DISPLAYVMSPEED        40123
 #define MENU_FIRMWARE_COMPATIBLE        40124
 #define MENU_FIRMWARE_CUSTOM            40125
+#define MENU_FILE_NEW                   40125
 #define MENU_FIRMWARE_LATEST            40126
 #define MENU_FIRMWARE_ERASE             40127
 #define MENU_HELP_ABOUT                 40128
@@ -86,9 +107,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        124
-#define _APS_NEXT_COMMAND_VALUE         40108
-#define _APS_NEXT_CONTROL_VALUE         1020
+#define _APS_NEXT_RESOURCE_VALUE        127
+#define _APS_NEXT_COMMAND_VALUE         40126
+#define _APS_NEXT_CONTROL_VALUE         1022
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

@@ -20,50 +20,6 @@ CONST std::wstring MkFile::GetVersion(VOID) CONST
 	return App->AnsiToUnicode((PCHAR)m_LayoutValues.Header.Version);
 }
 
-// Method for notifying the user upon failure to create the MkFile directory
-VOID MkFile::HandleCreateDirectoryError(VOID)
-{
-	// Retrieve error code from the failed operation
-	DWORD ErrorCode = GetLastError();
-
-	// Initialize variable for ease of accessibility
-	MainDialog& MainDialog = App->GetMainDialog();	// Handle various errors based on the error code
-
-	switch (ErrorCode) {
-	case ERROR_ALREADY_EXISTS:
-		// Folder already exists, no action needed
-		break;
-	case ERROR_ACCESS_DENIED:
-		// Permission issues:
-		// - Inform user about insufficient permissions
-		// - Suggest moving the application out of restricted locations (i.e. Downloads folder)
-		// - Provide support information
-		// - Throw an empty string to provide the system error message
-		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(ORANGE, L"Unable to create the MkFile and its folder in this location.  The application does not have the necessary permissions to perform this operation in this location.\r\n");
-		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(ORANGE, L"Please make sure you have removed this application from your Downloads folder and placed it somewhere else such as its own folder on your Desktop.\r\n");
-		MainDialog.DisplaySupportInfo();
-		throw std::wstring(L"");
-		break;
-	case ERROR_ELEVATION_REQUIRED:
-		// Administrative privileges required:
-		// - Inform the user about the need for administrative privileges
-		// - Display the administrator status notification
-		// - Provide support information
-		// - Throw an empty string to provide the system error message
-		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(ORANGE, L"Creating the MkFile and its folder in this location requires administrative privileges.  Please run this application as an administrator and try again.\r\n");
-		MainDialog.DisplayAdministratorStatus();
-		MainDialog.DisplaySupportInfo();
-		throw std::wstring(L"");
-		break;
-	default:
-		// Handle any other error that may arrise
-		throw std::wstring(L"An error occured while creating the MkFile folder.");
-	}
-}
-
 // Method for processing the MkFile data while creating the directory and saving the extracted file data
 VOID MkFile::SetMkFileData(CONST PUCHAR FileData, CONST std::size_t FileSize)
 {
@@ -89,7 +45,7 @@ VOID MkFile::SetMkFileData(CONST PUCHAR FileData, CONST std::size_t FileSize)
 
 			// Create the "MkFile" directory and handle any access/elevation required errors
 			if (!CreateDirectory(L"MkFile", NULL))
-				HandleCreateDirectoryError();
+				App->HandleCreateDirectoryError(L"MkFile");
 
 			// Open the MkFile for creation and writing
 			if(!m_File->Open(GENERIC_WRITE, FILE_SHARE_WRITE, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, FALSE))

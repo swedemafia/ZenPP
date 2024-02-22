@@ -134,7 +134,14 @@ VOID StoreBuffer::InternalExpand(CONST std::size_t RequiredBytes)
 // Resizes the buffer to a new capacity
 VOID StoreBuffer::Resize(CONST std::size_t NewSize)
 {
-    PUCHAR NewBuffer = reinterpret_cast<PUCHAR>(std::realloc(m_Buffer.release(), NewSize + 2));
+    PUCHAR NewBuffer;
+
+    if (m_Buffer.get()) {
+        NewBuffer = reinterpret_cast<PUCHAR>(std::realloc(m_Buffer.release(), NewSize + 2));
+    }
+    else {
+        NewBuffer = reinterpret_cast<PUCHAR>(malloc(NewSize + 2));
+    }
 
     if (!NewBuffer)
         throw std::bad_alloc();

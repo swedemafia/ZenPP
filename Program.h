@@ -44,6 +44,7 @@ public:
 
 	// Public method for error display
 	VOID DisplayError(_In_ CONST std::wstring& AdditionalMessage);
+	VOID HandleCreateDirectoryError(_In_ CONST std::wstring& Directory);
 
 	// Public methods for ANSI to Unicode converstions
 	CONST std::string UnicodeToAnsi(_In_ CONST std::wstring& String);

@@ -31,7 +31,7 @@ BOOL FirmwareManager::SearchForDevice(VOID)
 BOOL FirmwareManager::PrepareCompatibleFirmware(VOID)
 {
 	// Verify if the current firmware version requires being erased
-	if (GetVersionInfo().GetMajor() > 2 || GetVersionInfo().GetMinor() > 1)
+	if ((GetVersionInfo().GetMajor() > 2) || (GetVersionInfo().GetMinor() > 1))
 		return SpawnEraseThread();
 
 	// Load the compatible firmware
@@ -85,12 +85,12 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 			throw std::wstring(L"An error occured while checking status; the device is not locked.");
 
 		// Step 2: prepare unlock
-		CopyMemory(&LockBlock, Manager->m_ResourceFile->GetFileData(), 0x70);
+		CopyMemory(LockBlock, Manager->m_ResourceFile->GetFileData(), 0x70);
 		Manager->DfuUnlock(LockBlock);
 
 		// Get status and wait
 		if (Manager->GetStatusAndWait().State != DfuController::Idle)
-			throw std::wstring(L"An error occured while unlocking the device firmware.");
+			throw std::wstring(L"An error occured while unlocking the device firmware (1).");
 
 		// Update Progress bar
 		BytesProcessed += 0x70;
@@ -146,7 +146,7 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 		DWORD BytesProcessed = 0;
 		DWORD BytesTotal = 0;
 		PBYTE FileData = 0;
-		std::unique_ptr<UCHAR[]> CustomFileData;
+		std::shared_ptr<UCHAR[]> CustomFileData;
 		UCHAR LockBlock[0x70] = { 0 };
 		UCHAR Payload[0x420] = { 0 };
 		USHORT Block = 0;
@@ -179,7 +179,7 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 
 		// Get status and wait
 		if (Manager->GetStatusAndWait().State != DfuController::Idle)
-			throw std::wstring(L"An error occured while unlocking the firmware on the device.");
+			throw std::wstring(L"An error occured while unlocking the firmware on the device (2).");
 
 		// Update Progress bar
 		BytesProcessed += 0x70;
@@ -321,11 +321,11 @@ VOID FirmwareManager::UpdateDescriptors(VOID)
 	GetDeviceDescriptors();
 
 	// Prepare semantic version object information
-	std::wstring_view WideStrVersion = GetFirmwareVersion();
+	std::wstring WideStrVersion = GetFirmwareVersion();
 
 	try {
 		// Initialize a new SemanticVersion object
-		m_SemanticVersion = std::make_unique<SemanticVersion>(App->UnicodeToAnsi(WideStrVersion.data()));
+		m_SemanticVersion = std::make_unique<SemanticVersion>(App->UnicodeToAnsi(WideStrVersion.c_str()));
 
 		// Build display string
 		std::wstring DescriptorText =

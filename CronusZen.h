@@ -19,6 +19,7 @@ public:
 		DeviceCleanup,
 		FactoryReset,
 		RefreshAttachedDevices,
+		ProgramDevice,
 		SoftReset,
 		TogglePs4Specialty,
 		ToggleRemotePlay,
@@ -170,7 +171,14 @@ public:
 	SemanticVersion& GetFirmwareVersion(VOID) CONST;
 
 	// Public method for queueing a command
-	VOID QueueCommand(_In_ CONST UCHAR Count, CommandBase& Command);
+	VOID QueueCommand(_In_ CONST UCHAR Count, _In_ CommandBase& Command);
+	VOID QueueCommand(_In_ CONST UCHAR Count, _In_ CONST USHORT Size, _In_ CommandBase& Command);
+
+	// Public method for slots configuration management
+	VOID SlotsAdd(VOID);
+	VOID SlotsRemove(_In_ CONST UINT Slot);
+	VOID SlotsProgram(VOID);
+	CONST UCHAR SlotsUsed(VOID) CONST;
 
 protected:
 	// Virtual callback methods for various IOCP operations
@@ -284,7 +292,7 @@ private:
 		UCHAR RumbleValueRt;
 		UCHAR RumbleValueLt;
 		UCHAR BatteryValue;
-		UCHAR Input[38];
+		CHAR Input[38];
 		UCHAR Unused[4];
 		UCHAR ReportType;
 		UCHAR VmSpeedValue;
@@ -340,6 +348,17 @@ private:
 		UINT Unknown6;
 		PVarConfigData ConfigData[64] = { 0 };
 	};
+
+	struct SlotConfig {
+		BOOLEAN NeedByteCode;
+		BOOLEAN MustFlashConfig;
+		BOOLEAN MustFlashGamepack;
+		SlotConfigData Config;
+		std::wstring ByteCodeFile;
+		std::wstring ByteCodeFilePath;
+		std::wstring ConfigFilePath;
+	};
+
 #pragma pack()
 
 	struct UnexpectedSize {
@@ -348,13 +367,16 @@ private:
 		USHORT Expected;
 	};
 
+	// Outgoing command queue
 	std::deque<PUCHAR> m_Queue;
 
+	// Various structures for various information about the device
 	std::unique_ptr<AttachedDevice[]> m_AttachedDevices;
 	std::unique_ptr<ExclusionListData> m_ExclusionList;
 	std::unique_ptr<FragmentData[]> m_Fragments;
 	std::unique_ptr<MkFile> m_MkFile;
-	std::unique_ptr<SlotConfigData[]> m_SlotConfig;
+	std::unique_ptr<SlotConfig[]> m_SlotConfig; // Used for programming the device
+	std::unique_ptr<SlotConfigData[]> m_SlotConfigData; // Used for actual slot config on the device as returned via ReadSlotsCfg
 
 	// Firmware version information
 	std::unique_ptr<SemanticVersion> m_SemanticVersion;
@@ -372,6 +394,7 @@ private:
 	UCHAR m_TargetMode = 0;
 	UCHAR m_Checksum[4];
 	UCHAR m_BluetoothDevices = 0;
+	UCHAR m_SlotsUsed = 0;
 	UCHAR m_WiredDevices = 0;
 	std::wstring m_Firmware;
 	std::wstring m_Serial;
@@ -382,11 +405,19 @@ private:
 
 	CONST std::wstring GetDeviceDescription(_In_ CONST USHORT VendorID, _In_ CONST USHORT ProductID);
 
+	// Private method for downloading byte code off the device
+	VOID CheckByteCodeFiles(VOID);
+
+	// Private method for flashing scripts
+	VOID FlashNextConfig(VOID);
+	VOID FlashNextGamepack(VOID);
+
 	VOID OnExclusionListRead(VOID);
 	VOID OnFragmentRead(VOID);
 	VOID OnGetFirmware(VOID);
 	VOID OnGetSerial(VOID);
 	VOID OnGetStatus(VOID);
+	VOID OnReadByteCode(VOID);
 	VOID OnReadSlotsCfg(VOID);
 	VOID OnRequestAttachedDevices(VOID);
 	VOID OnRequestMkFile(VOID);
@@ -417,6 +448,12 @@ class ChangeSlotBCommand : public CommandBase
 {
 public:
 	explicit ChangeSlotBCommand(VOID) : CommandBase(CronusZen::PacketID::CHANGESLOTB) { };
+};
+
+class ClCommand : public CommandBase
+{
+public:
+	explicit ClCommand(VOID) : CommandBase(CronusZen::PacketID::CL) { };
 };
 
 class ClearBluetoothCommand : public CommandBase
@@ -459,6 +496,18 @@ public:
 	explicit FactoryResetCommand(VOID) : CommandBase(CronusZen::PacketID::FACTORYRESET) { };
 };
 
+class FlashConfigCommand : public CommandBase
+{
+public:
+	explicit FlashConfigCommand(VOID) : CommandBase(CronusZen::PacketID::FLASHCONFIG) { };
+};
+
+class FlashGamepackCommand : public CommandBase
+{
+public:
+	explicit FlashGamepackCommand(VOID) : CommandBase(CronusZen::PacketID::FLASHGAMEPACK) { };
+};
+
 class FragmentReadCommand : public CommandBase
 {
 public:
@@ -482,6 +531,14 @@ class GetStatusCommand : public CommandBase
 {
 public:
 	explicit GetStatusCommand(VOID) : CommandBase(CronusZen::PacketID::GETSTATUS) { };
+};
+
+class ReadByteCodeCommand : public CommandBase
+{
+public:
+	explicit ReadByteCodeCommand(UCHAR Slot) : CommandBase(CronusZen::PacketID::READBYTECODE) {
+		InsertByte(0x31 + Slot);
+	}
 };
 
 class ReadSlotsCfgCommand : public CommandBase

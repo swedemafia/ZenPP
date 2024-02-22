@@ -32,7 +32,7 @@ CONST BOOLEAN SemanticVersion::IsBeta(VOID) CONST
 
 VOID SemanticVersion::ProcessVersionString(_In_ CONST std::string VersionString)
 {
-	std::unique_ptr<std::regex> Pattern(new std::regex(R"((\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?)"));
+	std::unique_ptr<std::regex> Pattern = std::make_unique<std::regex>(R"((\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?)");
 	std::smatch Matches;
 
 	// Reset current version information

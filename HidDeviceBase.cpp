@@ -34,7 +34,7 @@ BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 		m_WriteOutputLength = Capabilities.OutputReportByteLength;
 
 		// Allocate receive buffer based on the input report length
-		m_ReceiveBuffer = std::make_unique<BYTE[]>(m_ReadInputLength);
+		//m_ReceiveBuffer = std::make_unique<UCHAR[]>(m_ReadInputLength);
 
 		// Free preparsed data
 		HidD_FreePreparsedData(PreparsedData);
@@ -61,6 +61,9 @@ VOID HidDeviceBase::DisconnectFromDevice(VOID)
 	CronusZen& CronusZen = App->GetCronusZen();
 	MainDialog& MainDialog = App->GetMainDialog();
 
+	// Suspend thread
+	SuspendThread(GetIocpThreadHandle());
+
 	// Close out the IOCP
 	CancelIocp();
 
@@ -77,13 +80,13 @@ VOID HidDeviceBase::DisconnectFromDevice(VOID)
 		m_Device.reset();
 	}
 
-	// Suspend thread
-	SuspendThread(GetIocpThreadHandle());
-
 	if (CronusZen.GetConnectionState() == CronusZen::Connected) {
 		// Update device state
 		CronusZen.SetConnectionState(CronusZen::Disconnected);
 	}
+	
+	// Clear main dialog listbox
+	MainDialog.ListBoxClear();
 }
 
 // Method for scanning and calling to open a connection to the device
@@ -143,6 +146,9 @@ VOID HidDeviceBase::AsynchronousRead(VOID)
 	// Reset the overlapped structure for the read operation
 	ZeroMemory(GetOverlappedRead(), sizeof(OVERLAPPED));
 
+	// Allocate receive buffer based on the input report length
+	m_ReceiveBuffer = std::make_unique<UCHAR[]>(m_ReadInputLength);
+	
 	// Initiate asynchronous read request from the device
 	if (!ReadFile(m_Device->GetHandle(), m_ReceiveBuffer.get(), m_ReadInputLength, nullptr, GetOverlappedRead())) {
 		// Check for errors (excluding ERROR_IO_PENDING, which indicates asynchronous completion/success)

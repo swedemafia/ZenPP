@@ -50,6 +50,7 @@ DWORD DialogBase::RichEditThreadProc(LPVOID Parameter)
 			EditStream.pfnCallback = (EDITSTREAMCALLBACK)EditStreamCallback;
 
 			// Send messages for current chunk
+			SendMessage(Base->m_hWndRichEdit, WM_SETFOCUS, 0, 0);
 			SendMessage(Base->m_hWndRichEdit, EM_SETSEL, (WPARAM)-1, (LPARAM)-1);
 			SendMessage(Base->m_hWndRichEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&CharFormat));
 			SendMessage(Base->m_hWndRichEdit, EM_STREAMIN, SF_TEXT | SF_UNICODE | SFF_SELECTION, reinterpret_cast<LPARAM>(&EditStream));

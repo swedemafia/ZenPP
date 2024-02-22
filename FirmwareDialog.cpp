@@ -68,8 +68,15 @@ INT_PTR FirmwareDialog::OnDeviceChange(CONST WPARAM wParam)
 	// When a device arrives or is removed
 	if (wParam == DBT_DEVICEARRIVAL || wParam == DBT_DEVICEREMOVECOMPLETE) {
 		// Only update for our device only
-		if((m_Manager->IsDeviceFound() != m_Manager->SearchForDevice()) && !m_Manager->UpdateCompleted())
+		BOOL DeviceFound = m_Manager->IsDeviceFound();
+		BOOL Search = m_Manager->SearchForDevice();
+		BOOL Complete = m_Manager->UpdateCompleted();
+
+		if ((DeviceFound != Search) && !Complete)
 			UpdateCapabilities();
+
+		//if((m_Manager->IsDeviceFound() != m_Manager->SearchForDevice()) && !m_Manager->UpdateCompleted())
+			//UpdateCapabilities();
 	}
 
 	return TRUE;
@@ -161,7 +168,7 @@ VOID FirmwareDialog::UpdateInstructions(VOID)
 {
 		// Update instructions
 		SetWindowText(m_LabelInstructions, m_Instructions[m_Step].c_str());
-		SetWindowText(m_LabelStep, std::wstring_view(L"Step " + std::to_wstring(m_Step + 1) + L":").data());
+		SetWindowText(m_LabelStep, std::wstring(L"Step " + std::to_wstring(m_Step + 1) + L":").c_str());
 
 		// Only update Bitmap for the first two steps
 		if (m_Step != 2) {

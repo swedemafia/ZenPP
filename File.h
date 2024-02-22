@@ -27,7 +27,7 @@ public:
 	// Public methods for file information retrieval
 	CONST HANDLE GetHandle(VOID) CONST;
 	CONST LONGLONG GetFileSize(VOID) CONST;
-	VOID GetFileData(std::unique_ptr<UCHAR[]>& Buffer);
+	VOID GetFileData(std::shared_ptr<UCHAR[]>& Buffer);
 
 private:
 	// Private members for file state and information

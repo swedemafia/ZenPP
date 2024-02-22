@@ -11,8 +11,23 @@ public:
 	// Destructor for cleanup
 	~MainDialog() = default;
 
+	// Structure for listbox item
+	struct ListBoxItem {
+		BOOLEAN IsBeingDeleted;
+		BOOLEAN IsBeingProgrammed;
+		UCHAR Slot;
+		USHORT ByteCodeLength;
+		USHORT GamepackID;
+		WCHAR Title[52];
+		std::wstring Path;
+	};
+
 	// Public method for menu handle retrieval
 	HMENU GetMenuHandle(VOID) CONST;
+
+	// Public methods for listbox control management
+	VOID ListBoxAdd(_In_ CONST ListBoxItem* Item);
+	VOID ListBoxClear(VOID);
 
 	// Public methods for displaying RichEdit messages
 	VOID DisplayAdministratorStatus(VOID);
@@ -42,8 +57,11 @@ private:
 
 	// Private methods for handling specific commands
 	// Dialog buttons
+	INT_PTR OnCommandMainAddScript(VOID);
+	INT_PTR OnCommandMainRemovedSelectedScripts(VOID);
 	INT_PTR OnCommandMainEraseAllScripts(VOID);
 	INT_PTR OnCommandMainFactoryReset(VOID);
+	INT_PTR OnCommandMainProgramDevice(VOID);
 	INT_PTR OnCommandMainSoftReset(VOID);
 
 	// 'Connection' menu
@@ -79,6 +97,7 @@ private:
 
 	// 'File' menu
 	INT_PTR OnCommandFileExit(VOID);
+	INT_PTR OnCommandFileNew(VOID);
 
 	// 'Firmware' menu
 	INT_PTR OnCommandFirmwareCompatible(VOID);
@@ -97,6 +116,7 @@ private:
 	INT_PTR OnCtlColorStatic(_In_ CONST WPARAM wParam);
 	INT_PTR OnDeviceChange(_In_ CONST WPARAM wParam);
 	INT_PTR OnDestroy(VOID);
+	INT_PTR OnDrawItem(_In_ CONST WPARAM wParam, _In_ CONST LPARAM lParam);
 	INT_PTR OnGetMinMaxInfo(_In_ CONST LPARAM lParam);
 	INT_PTR OnInitDialog(VOID);
 	INT_PTR OnNotify(_In_ CONST LPARAM lParam);

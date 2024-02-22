@@ -1,5 +1,29 @@
 #include "Precomp.h"
 
+// Method for inserting an item to the listbox
+VOID MainDialog::ListBoxAdd(CONST ListBoxItem* Item)
+{
+	// Append to end of the list
+	SendMessage(m_hWndSlotsListBox, LB_INSERTSTRING, -1, (LPARAM)Item);
+}
+
+// Method for clearing the listbox and deleting all associated memory for each listbox item
+VOID MainDialog::ListBoxClear(VOID)
+{
+	// Iterate though each item of the listbox and delete it's data
+	for (int i = 0; i < SendMessage(m_hWndSlotsListBox, LB_GETCOUNT, 0, 0); i++) {
+		// Get the listbox item data
+		ListBoxItem* ItemData = reinterpret_cast<ListBoxItem*>(SendMessage(m_hWndSlotsListBox, LB_GETITEMDATA, i, 0));
+
+		// Validate a pointer to the object was retreived and delete it
+		if(ItemData != reinterpret_cast<ListBoxItem*>(LB_ERR))
+			delete ItemData;
+	}
+
+	// Reset the listbox content
+	SendMessage(m_hWndSlotsListBox, LB_RESETCONTENT, 0, 0);
+}
+
 // Method for displaying information regarding administrative privileges
 VOID MainDialog::DisplayAdministratorStatus(VOID)
 {
@@ -172,11 +196,8 @@ VOID MainDialog::UpdateSlotsData(CONST UCHAR SlotsUsed, CONST UINT BytesUsed)
 		}
 	} else {
 		// Format string with proper pluralization for slots and byte count
-		SlotsString = std::to_wstring(SlotsUsed) + L" slot";
-		if (SlotsUsed > 1) {
-			SlotsString += L"s";
-		}
-		SlotsString += L" (" + std::to_wstring(BytesUsed) + L" bytes, " + std::to_wstring(262120 - BytesUsed) + L" free)";
+		SlotsString = std::to_wstring(SlotsUsed) + L" slot" + ((SlotsUsed > 1) ? L"s" : L"");
+		SlotsString += L" (" + std::to_wstring(BytesUsed) + L" used, " + std::to_wstring(262136 - BytesUsed) + L" free)";
 	}
 
 	// UIpdate the edit box caption with the formatted slots information
@@ -199,6 +220,7 @@ INT_PTR MainDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONST
 	case WM_CTLCOLORSTATIC:							return Dialog->OnCtlColorStatic(wParam);
 	case WM_DESTROY:								return Dialog->OnDestroy();
 	case WM_DEVICECHANGE:							return Dialog->OnDeviceChange(wParam);
+	case WM_DRAWITEM:								return Dialog->OnDrawItem(wParam, lParam);
 	case WM_INITDIALOG:								return Dialog->OnInitDialog();
 	case WM_GETMINMAXINFO:							return Dialog->OnGetMinMaxInfo(lParam);
 	case WM_NOTIFY:									return Dialog->OnNotify(lParam);
@@ -215,7 +237,7 @@ INT_PTR MainDialog::OnClose(VOID)
 
 	// Exit API mode if connected
 	if (Cronus.GetConnectionState() == CronusZen::Connected) {
-		std::unique_ptr<ExitApiModeCommand> ExitApiMode(new ExitApiModeCommand);
+		std::unique_ptr<ExitApiModeCommand> ExitApiMode = std::make_unique<ExitApiModeCommand>();
 		Cronus.QueueCommand(1, *ExitApiMode);
 	}
 
@@ -228,8 +250,12 @@ INT_PTR MainDialog::OnClose(VOID)
 INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 {
 	switch (LOWORD(wParam)) {
+	// Dialog Buttons
+	case BUTTON_MAIN_ADDSCRIPT:						return OnCommandMainAddScript();
+	case BUTTON_MAIN_REMOVESELECTION:				return OnCommandMainRemovedSelectedScripts();
 	case BUTTON_MAIN_ERASEALLSCRIPTS:				return OnCommandMainEraseAllScripts();
 	case BUTTON_MAIN_FACTORYRESET:					return OnCommandMainFactoryReset();
+	case BUTTON_MAIN_PROGRAMDEVICE:					return OnCommandMainProgramDevice();
 	case BUTTON_MAIN_SOFTRESET:						return OnCommandMainSoftReset();
 
 	// 'Connection'
@@ -279,6 +305,68 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	return FALSE;
 }
 
+// Method for processing the "Add Script" command button
+INT_PTR MainDialog::OnCommandMainAddScript(VOID)
+{
+	if (m_CronusZen.SlotsUsed() == 8) {
+		MessageBox(m_hWnd, L"You are unable to add more than 8 scripts to your Cronus Zen!\r\n\r\n- Select some scripts in the listbox.\r\n- Press \"Remove Selected Scripts.\"\r\n- Press \"Program Device.\"\r\n- Try adding a new script again.", L"Slots Manager", MB_ICONERROR | MB_OK);
+	} else {
+		m_CronusZen.SlotsAdd();
+	}
+
+	return TRUE;
+}
+
+// Method for processing the "Remove Selected Scripts" command button
+INT_PTR MainDialog::OnCommandMainRemovedSelectedScripts(VOID)
+{
+	// Loop through the listbox and remove selected items
+	for (int i = 0; i < SendMessage(m_hWndSlotsListBox, LB_GETCOUNT, 0, 0); i++) {
+		// Check if the current listbox item index is selected
+		if (SendMessage(m_hWndSlotsListBox, LB_GETSEL, i, 0)) {
+			// Cast and retreive listbox item data to usable data
+			ListBoxItem* ItemData = reinterpret_cast<ListBoxItem*>(SendMessage(m_hWndSlotsListBox, LB_GETITEMDATA, i, 0));
+
+			// Do not even bother if the item is already marked for deletion
+			if (ItemData->IsBeingDeleted)
+				return TRUE;
+
+			// Build notification string
+			std::wstring Confirmation = L"Slot #" + std::to_wstring(ItemData->Slot + 1) + L":\r\n\r\nAre you sure you want to mark " + std::wstring(ItemData->Title) + L" for deletion?";
+
+			// Prompt user to ensure that they would like to proceed
+			if (MessageBox(m_hWnd, Confirmation.c_str(), L"Slots Manager", MB_ICONQUESTION | MB_YESNO) == IDYES) {
+				// If script is just added and not programmed, just delete it entirely
+				if (ItemData->IsBeingProgrammed) {
+					SendMessage(m_hWndSlotsListBox, LB_DELETESTRING, i, 0);
+				} else {
+					// Mark slot for deletion
+					ItemData->IsBeingDeleted = TRUE;
+					// Update item data in listbox
+					SendMessage(m_hWndSlotsListBox, LB_SETITEMDATA, i, reinterpret_cast<LPARAM>(ItemData));
+				}
+
+				// Correct slot numbers when a slot is removed
+				for (int j = ItemData->Slot + 1; j < SendMessage(m_hWndSlotsListBox, LB_GETCOUNT, 0, 0); j++) {
+					ListBoxItem* CurrentItemData = reinterpret_cast<ListBoxItem*>(SendMessage(m_hWndSlotsListBox, LB_GETITEMDATA, j, 0));
+					if (!CurrentItemData->IsBeingDeleted) {
+						CurrentItemData->Slot--;
+						SendMessage(m_hWndSlotsListBox, LB_SETITEMDATA, j, reinterpret_cast<LPARAM>(CurrentItemData));
+					}
+				}
+
+				// Remove from internal slot programming list
+				m_CronusZen.SlotsRemove(ItemData->Slot);
+			}
+		}
+	}
+
+	// Refresh the listbox
+	InvalidateRect(m_hWndSlotsListBox, NULL, TRUE);
+
+	return TRUE;
+}
+
 INT_PTR MainDialog::OnCommandMainEraseAllScripts(VOID)
 {
 	m_CronusZen.CreateWorkerThread(CronusZen::DeviceCleanup);
@@ -288,6 +376,12 @@ INT_PTR MainDialog::OnCommandMainEraseAllScripts(VOID)
 INT_PTR MainDialog::OnCommandMainFactoryReset(VOID)
 {
 	m_CronusZen.CreateWorkerThread(CronusZen::FactoryReset);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandMainProgramDevice(VOID)
+{
+	m_CronusZen.SlotsProgram();
 	return TRUE;
 }
 
@@ -320,9 +414,9 @@ INT_PTR MainDialog::OnCommandDeviceClearBluetoothDevices(VOID)
 INT_PTR MainDialog::OnCommandDeviceCycleSlots(VOID)
 {
 	// Build required commands to change the running slot
-	std::unique_ptr<ChangeSlotACommand> ChangeSlotA(new ChangeSlotACommand);
-	std::unique_ptr<ChangeSlotBCommand> ChangeSlotB(new ChangeSlotBCommand);
-	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus(new StreamIoStatusCommand(CronusZen::Off));
+	std::unique_ptr<ChangeSlotACommand> ChangeSlotA = std::make_unique<ChangeSlotACommand>();
+	std::unique_ptr<ChangeSlotBCommand> ChangeSlotB = std::make_unique<ChangeSlotBCommand>();
+	std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(CronusZen::Off);
 
 	// Queue commands to be sent to the device
 	m_CronusZen.QueueCommand(1, *StreamIoStatus);
@@ -443,6 +537,11 @@ INT_PTR MainDialog::OnCommandFileExit(VOID)
 	return TRUE;
 }
 
+INT_PTR MainDialog::OnCommandFileNew(VOID)
+{
+	return TRUE;
+}
+
 INT_PTR MainDialog::OnCommandFirmwareCompatible(VOID)
 {
 	App->CreateFirmwareDialog(FirmwareManager::InstallCompatibleFirmware);
@@ -508,6 +607,52 @@ INT_PTR MainDialog::OnDeviceChange(CONST WPARAM wParam)
 	if (wParam == DBT_DEVICEARRIVAL) {
 		// Attempt to connect when a device arrives to the system
 		m_CronusZen.ConnectToDevice();
+	}
+
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnDrawItem(CONST WPARAM wParam, CONST LPARAM lParam)
+{
+	// Cast the WM_DRAWITEM lParam into usable data
+	LPDRAWITEMSTRUCT DrawItemStruct = reinterpret_cast<LPDRAWITEMSTRUCT>(lParam);
+
+	if (DrawItemStruct && (DrawItemStruct->itemID != -1) && (DrawItemStruct->hwndItem == m_hWndSlotsListBox)) {
+		// Cast the DRAWITEMSTRUCT itemData into usable data
+		ListBoxItem* ListBoxItemData = reinterpret_cast<ListBoxItem*>(DrawItemStruct->itemData);
+
+		// Determine the background color of the listbox item based on whether it is selected or not
+		if (DrawItemStruct->itemState & ODS_SELECTED && (DrawItemStruct->itemAction & ODA_FOCUS)) {
+			// Highlight if item is selected
+			SetBkColor(DrawItemStruct->hDC, GetSysColor(COLOR_HIGHLIGHT));
+		} else {
+			// Do not highlight if item is not selected
+			SetBkColor(DrawItemStruct->hDC, BLACK);
+		}
+
+		// Determine the text color
+		if (ListBoxItemData->IsBeingDeleted) {
+			// Red for being deleted
+			SetTextColor(DrawItemStruct->hDC, RED);
+
+		} else if (ListBoxItemData->IsBeingProgrammed) {
+			// Light green for needing to be programmed
+			SetTextColor(DrawItemStruct->hDC, LIGHTGREEN);
+
+		} else if (ListBoxItemData->GamepackID != 0xffff) {
+			// Light blue for gamepacks
+			SetTextColor(DrawItemStruct->hDC, LIGHTBLUE);
+
+		} else {
+			// White for scripts
+			SetTextColor(DrawItemStruct->hDC, WHITE);
+		}
+
+		// Build our listbox item string
+		std::wstring SlotString = L"#" + std::to_wstring(ListBoxItemData->Slot + 1) + L" " + ListBoxItemData->Title;
+
+		// Draw the script title
+		TextOut(DrawItemStruct->hDC, DrawItemStruct->rcItem.left, DrawItemStruct->rcItem.top, SlotString.c_str(), SlotString.size());
 	}
 
 	return TRUE;

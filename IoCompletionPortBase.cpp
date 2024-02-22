@@ -94,17 +94,17 @@ DWORD IoCompletionPortBase::IocpEventThreadProc(LPVOID Parameter)
 {
 	// Declare pointer to the IOCP port object associated with the thread
 	IoCompletionPortBase* Base = reinterpret_cast<IoCompletionPortBase*>(Parameter);
+	LPOVERLAPPED Overlapped;
 
 	while (Base->m_IocpThreadHandle != INVALID_HANDLE_VALUE) {
 		// Completion event variables
 		DWORD NumberOfBytesTransferred = 0;
-		std::unique_ptr<LPOVERLAPPED> Overlapped = std::make_unique<LPOVERLAPPED>();
 		ULONG_PTR CompletionKey = NULL;
 
 		// Query completion status for an IOCP event
-		if (GetQueuedCompletionStatus(Base->m_IocpHandle, &NumberOfBytesTransferred, &CompletionKey, Overlapped.get(), INFINITE)) {
+		if (GetQueuedCompletionStatus(Base->m_IocpHandle, &NumberOfBytesTransferred, &CompletionKey, &Overlapped, INFINITE)) {
 			// Call IOCP event handler to dispatch the event
-			Base->HandleCompletionEvent(NumberOfBytesTransferred, *Overlapped.get());
+			Base->HandleCompletionEvent(NumberOfBytesTransferred, Overlapped);
 		} else {
 			// Post queued completion status for the client device closing the connection 
 			PostQueuedCompletionStatus(Base->m_IocpHandle, 0, IocpCompletionKey::Disconnect, &Base->m_OverlappedDisconnect.Overlapped);

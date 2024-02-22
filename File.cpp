@@ -99,7 +99,7 @@ CONST BOOL File::Write(LPCVOID Buffer, CONST DWORD NumberOfBytesToWrite, LPDWORD
 	return TRUE;
 }
 
-VOID File::GetFileData(std::unique_ptr<UCHAR[]>& Buffer)
+VOID File::GetFileData(std::shared_ptr<UCHAR[]>& Buffer)
 {
 	DWORD FileSize = GetFileSize() & 0xffffffff;
 	if (!FileSize) {
@@ -107,7 +107,7 @@ VOID File::GetFileData(std::unique_ptr<UCHAR[]>& Buffer)
 		return;
 	}
 
-	Buffer = std::unique_ptr<UCHAR[]>(new UCHAR[FileSize]{ 0 });
+	Buffer = std::shared_ptr<UCHAR[]>(new UCHAR[FileSize]{ 0 });
 	DWORD numberOfBytesRead = 0;
 
 	if (!Read(Buffer.get(), FileSize, &numberOfBytesRead, NULL)) {

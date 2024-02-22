@@ -24,6 +24,7 @@
 
 #include <Windows.h>
 
+#include <AclAPI.h>
 #include <CommCtrl.h>
 #include <commdlg.h>
 #include <Dbt.h>
@@ -60,6 +61,7 @@
 
 // Dialogs:
 #include "AboutDialog.h"
+#include "CodeDialog.h"
 #include "FirmwareDialog.h"
 #include "MainDialog.h"
 

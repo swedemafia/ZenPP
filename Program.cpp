@@ -60,6 +60,7 @@ VersionCheck& Program::GetVersionCheck(VOID) CONST
 	return *m_VersionCheck;
 }
 
+
 BOOLEAN Program::InitializeProgram(VOID)
 {
 	try
@@ -78,7 +79,7 @@ BOOLEAN Program::InitializeProgram(VOID)
 
 		// Create dialog
 		m_MainDialog->Create(DIALOG_MAIN);
-		m_MainDialog->RichEditInitialize(RICHEDIT_MAIN_OUTPUT, L"Cascadia Code", 180, 1160);
+		m_MainDialog->RichEditInitialize(RICHEDIT_MAIN_OUTPUT, L"Courier New", 180, 1160);
 		m_MainDialog->DisplayStartupInfo();
 
 		// Display message to RichEdit control if the app was just updated
@@ -104,9 +105,10 @@ BOOLEAN Program::InitializeProgram(VOID)
 			EnableMenuItem(GetMainDialog().GetMenuHandle(), MENU_HELP_NEWS, MF_BYCOMMAND | MF_DISABLED);
 
 		// Perform version check based on build version
-		//m_VersionCheck->CheckUpdatesAndNews();
-
 		m_CronusZen->ConnectToDevice();
+#ifndef _DEBUG
+		m_VersionCheck->CheckUpdatesAndNews();
+#endif
 
 	}
 	catch (CONST std::wstring& CustomMessage)
@@ -135,8 +137,17 @@ BOOL Program::IsQuitting(VOID) CONST
 // Method for converting an ANSI string to a Unicode string
 CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
 {
-	std::wstring_convert<std::codecvt_utf8<WCHAR>> Converter;
-	return Converter.from_bytes(String);
+	int BufferSize = MultiByteToWideChar(CP_ACP, 0, String.c_str(), -1, nullptr, 0);
+	if (BufferSize == 0)
+	{
+		DisplayError(L"An error occured while converting an ANSI string to Unicode.");
+		return L"";
+	}
+
+	std::wstring Result(BufferSize - 1, L'\0');
+	MultiByteToWideChar(CP_ACP, 0, String.c_str(), -1, &Result[0], BufferSize);
+
+	return Result;
 }
 
 // Method for converting raw bytes to a Unicode string
@@ -149,8 +160,17 @@ CONST std::wstring Program::BytesToUnicode(CONST PBYTE& Bytes, CONST UINT BytesS
 // Method for converting a Unicode string to an ANSI string
 CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
 {
-	std::wstring_convert<std::codecvt_utf8<WCHAR>> Converter;
-	return Converter.to_bytes(String);
+	INT BufferSize = WideCharToMultiByte(CP_ACP, 0, String.c_str(), -1, nullptr, 0, nullptr, nullptr);
+
+	if (BufferSize == 0) {
+		DisplayError(L"An error occured while converting the Unicode string " + String + L" to ANSI.");
+		return "";
+	}
+
+	std::string Result(BufferSize - 1, '\0');
+	WideCharToMultiByte(CP_ACP, 0, String.c_str(), -1, &Result[0], BufferSize, nullptr, nullptr);
+
+	return Result;
 }
 
 HINSTANCE Program::GetInstance(VOID) CONST
@@ -278,6 +298,50 @@ VOID Program::DisplayError(CONST std::wstring& AdditionalMessage)
 	// Free memory
 	if (ErrorBufferSize && (ErrorBuffer != nullptr))
 		LocalFree(ErrorBuffer);
+}
+
+// Method for notifying the user upon failure to create the a directory
+VOID Program::HandleCreateDirectoryError(CONST std::wstring& Directory)
+{
+	// Retrieve error code from the failed operation
+	DWORD ErrorCode = GetLastError();
+
+	// Initialize variable for ease of accessibility
+	MainDialog& MainDialog = App->GetMainDialog();	// Handle various errors based on the error code
+
+	switch (ErrorCode) {
+	case ERROR_ALREADY_EXISTS:
+		// Folder already exists, no action needed
+		break;
+	case ERROR_ACCESS_DENIED:
+		// Permission issues:
+		// - Inform user about insufficient permissions
+		// - Suggest moving the application out of restricted locations (i.e. Downloads folder)
+		// - Provide support information
+		// - Throw an empty string to provide the system error message
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"Unable to create the \"%ws\" folder in this location.  The application does not have the necessary permissions to perform this operation in this location.\r\n", Directory.c_str());
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"Please make sure you have removed this application from your Downloads folder and placed it somewhere else such as its own folder on your Desktop.\r\n");
+		MainDialog.DisplaySupportInfo();
+		throw std::wstring(L"");
+		break;
+	case ERROR_ELEVATION_REQUIRED:
+		// Administrative privileges required:
+		// - Inform the user about the need for administrative privileges
+		// - Display the administrator status notification
+		// - Provide support information
+		// - Throw an empty string to provide the system error message
+		MainDialog.PrintTimestamp();
+		MainDialog.PrintText(ORANGE, L"Creating the \"%ws\" folder in this location requires administrative privileges.  Please run this application as an administrator and try again.\r\n", Directory.c_str());
+		MainDialog.DisplayAdministratorStatus();
+		MainDialog.DisplaySupportInfo();
+		throw std::wstring(L"");
+		break;
+	default:
+		// Handle any other error that may arrise
+		throw std::wstring(L"An error occured while creating the " + Directory + L" folder.");
+	}
 }
 
 VOID Program::ShowAboutDialog(VOID)

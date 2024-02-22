@@ -21,7 +21,7 @@ public:
 	VOID DisconnectFromDevice(VOID);
 
 protected:
-	std::unique_ptr<BYTE[]> m_ReceiveBuffer;
+	std::unique_ptr<UCHAR[]> m_ReceiveBuffer;
 
 	// Protected methods for querying HID device information
 	BOOL QueryHIDDeviceCapabilities(VOID);

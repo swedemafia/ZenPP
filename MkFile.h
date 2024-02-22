@@ -215,9 +215,6 @@ private:
 
 	// Private member storing the entire MkFile data
 	LayoutValuesT m_LayoutValues;
-
-	// Private method for processing errors relating to creating a directory
-	VOID HandleCreateDirectoryError(VOID);
 };
 
 #endif

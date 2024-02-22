@@ -66,7 +66,7 @@ VOID VersionCheck::ProcessUpdateAddress(CONST std::string& UpdateAddress)
 
 VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 {
-	std::unique_ptr<SemanticVersion> VersionInfo(new SemanticVersion(VersionString.data()));
+	std::unique_ptr<SemanticVersion> VersionInfo = std::make_unique<SemanticVersion>(VersionString.data());
 
 	// Compare version
 	CHAR Major = VersionInfo->GetMajor();

@@ -123,6 +123,9 @@
     <ClInclude Include="CommandBase.h">
       <Filter>Header Files\Base Classes</Filter>
     </ClInclude>
+    <ClInclude Include="CodeDialog.h">
+      <Filter>Header Files\Dialogs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Precomp.cpp">
@@ -196,6 +199,9 @@
     </ClCompile>
     <ClCompile Include="CommandBase.cpp">
       <Filter>Source Files\Base Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="CodeDialog.cpp">
+      <Filter>Source Files\Dialogs</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

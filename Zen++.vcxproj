@@ -153,6 +153,7 @@
   <ItemGroup>
     <ClInclude Include="AboutDialog.h" />
     <ClInclude Include="BuildDateTime.h" />
+    <ClInclude Include="CodeDialog.h" />
     <ClInclude Include="CommandBase.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="CronusZen.h" />
@@ -180,6 +181,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AboutDialog.cpp" />
+    <ClCompile Include="CodeDialog.cpp" />
     <ClCompile Include="CommandBase.cpp" />
     <ClCompile Include="CronusZen.cpp" />
     <ClCompile Include="DeviceLocatorBase.cpp" />
