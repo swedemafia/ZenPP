@@ -383,7 +383,7 @@ private:
 
 	// Read command processing
 	std::unique_ptr<ParseBuffer> m_ParseBuffer;
-	std::unique_ptr<StoreBuffer> m_PreparseBuffer;
+	std::shared_ptr<StoreBuffer> m_PreparseBuffer;
 	USHORT m_PayloadLength = 0;
 
 	BOOLEAN m_IsHub[10];

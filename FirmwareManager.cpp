@@ -117,6 +117,8 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 
 	} catch (CONST std::wstring& CustomMessage) {
 		MessageBox(App->GetFirmwareDialog().GetHwnd(), CustomMessage.c_str(), L"Zen++ Firmware Manager", MB_ICONERROR | MB_OK);
+		Manager->m_Modifying = FALSE;
+		return 0;
 	}
 
 	// Update the edit control containing the device descriptors
@@ -302,7 +304,6 @@ BOOL FirmwareManager::PerformModification(VOID)
 
 		if ((m_ResourceFile && m_ResourceFile->GetFileSize()) || (m_CustomFile && m_CustomFile->GetFileSize())) {
 			m_Modifying = TRUE; // Set modifying state
-
 			switch (m_Modification) {
 			case FirmwareManager::FirmwareModificationPurpose::EraseFirmware:				return SpawnEraseThread();
 			case FirmwareManager::FirmwareModificationPurpose::InstallCompatibleFirmware:	return PrepareCompatibleFirmware();

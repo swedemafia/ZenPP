@@ -15,7 +15,7 @@ public:
 	~IoCompletionPortBase();
 
 	// Enumeration declaring completion keys for connect, read, send
-	enum IocpCompletionKey : ULONG {
+	enum IocpCompletionKey : UCHAR {
 		Connect = 0,
 		Disconnect,
 		Read,

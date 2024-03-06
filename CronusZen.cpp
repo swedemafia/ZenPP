@@ -26,6 +26,8 @@ CONST std::wstring CronusZen::GetDeviceDescription(_In_ CONST USHORT VendorID, _
 		case 0x02ea:	return L"Microsoft Xbox One Controller";
 		case 0x02fd:	return L"Microsoft Xbox One S Controller";
 		case 0x02ff:	return L"Microsoft Xbox One S Controller";
+		case 0x0719:	return L"Microsoft Xbox 360 Wireless Adapter";
+		case 0x0b00:	return L"Microsoft Xbox Elite Series 2 Controller";
 		case 0x0b12:	return L"Microsoft Xbox Series X|S Controller";
 		default:		return L"An unrecognized Microsoft device";
 		}
@@ -646,7 +648,7 @@ BOOL CronusZen::OnRead(CONST DWORD BytesRead)
 			//App->GetMainDialog().PrintText(RED, L"Bytes remain: %u\r\n", BytesRemaining);
 
 			// Allocate a buffer to hold the packet
-			m_PreparseBuffer = std::make_unique<StoreBuffer>(TotalSize);
+			m_PreparseBuffer = std::make_shared<StoreBuffer>(TotalSize);
 
 			// Handle a single-packet case
 			if ((Count == 1) && (ID != CronusZen::REQUESTATTACHEDDEVICES)) {
@@ -688,13 +690,16 @@ BOOL CronusZen::OnRead(CONST DWORD BytesRead)
 
 VOID CronusZen::HandleReadCommand(CONST PUCHAR PacketData, CONST std::size_t PacketSize)
 {
+	UCHAR Command = 0;
+	USHORT PayloadSize = 0;
+
 	try {
 		// Allocate a new parse buffer to process the read command
 		m_ParseBuffer = std::make_unique<ParseBuffer>(PacketData, PacketSize);
 
 		// Extract the packet header from the command
-		UCHAR Command = m_ParseBuffer->ExtractByte();
-		USHORT PayloadSize = m_ParseBuffer->ExtractShort();
+		Command = m_ParseBuffer->ExtractByte();
+		PayloadSize = m_ParseBuffer->ExtractShort();
 
 		m_ParseBuffer->Advance(1); // We do not care about the packet number
 
@@ -740,11 +745,11 @@ VOID CronusZen::HandleReadCommand(CONST PUCHAR PacketData, CONST std::size_t Pac
 	} catch (CONST UnexpectedSize& BadData) {
 		App->DisplayError(L"Unrecognized " + BadData.Command + L" command received; got " + std::to_wstring(BadData.Received) + L" bytes and expected at least " + std::to_wstring(BadData.Expected + 4) + L".");
 	} catch (CONST std::bad_alloc&) {
-		App->DisplayError(L"Insufficient memory is available to handle the incoming data.");
+		App->DisplayError(L"Insufficient memory is available to handle the incoming data (command=" + std::to_wstring(Command) + L", payload size=" + std::to_wstring(PayloadSize) + L").");
 	} catch (CONST std::exception&) {
-		App->DisplayError(L"A buffer overrun was reached during HandleReadCommand.");
+		App->DisplayError(L"A buffer overrun was reached during HandleReadCommand (command=" + std::to_wstring(Command) + L", payload size=" + std::to_wstring(PayloadSize) + L").");
 	} catch (...) {
-		App->DisplayError(L"Unhandled exception caught during HandleReadCommand.");
+		App->DisplayError(L"Unhandled exception caught during HandleReadCommand (command=" + std::to_wstring(Command) + L", payload size=" + std::to_wstring(PayloadSize) + L").");
 	}
 
 	DisconnectFromDevice(); // Disconnect from device as an exception was caught
@@ -1003,14 +1008,14 @@ VOID CronusZen::OnGetSerial(VOID)
 	if (m_SemanticVersion->IsBeta()) {
 		// Specific logic depends on build number
 		if (m_SemanticVersion->GetBuild() == 68) {
-			m_Checksum[0] ^= m_Serial[4];
+			m_Checksum[0] ^= m_Serial[8];
 			m_Checksum[1] ^= m_Serial[0];
-			m_Checksum[2] ^= m_Serial[2];
-			m_Checksum[3] ^= m_Serial[6];
+			m_Checksum[2] ^= m_Serial[4];
+			m_Checksum[3] ^= m_Serial[12];
 		} else {
-			m_Checksum[0] ^= m_Serial[2];
-			m_Checksum[1] ^= m_Serial[4];
-			m_Checksum[2] ^= m_Serial[6];
+			m_Checksum[0] ^= m_Serial[4];
+			m_Checksum[1] ^= m_Serial[8];
+			m_Checksum[2] ^= m_Serial[12];
 			m_Checksum[3] ^= m_Serial[0];
 		}
 	}
@@ -1317,7 +1322,7 @@ VOID CronusZen::OnReadByteCode(VOID)
 	ByteCodeExpectedLength = m_SlotConfig[ByteCodeSlot].Config.ByteCodeLength - 1;
 
 	// Check the length of the data returned against what it should be
-	if (ByteCodeReturnedLength == ByteCodeExpectedLength) {
+	if (ByteCodeReturnedLength >= ByteCodeExpectedLength) {
 		// Obtain a copt of the Unicode version of the slot title
 		std::wstring UnicodeTitle = App->AnsiToUnicode((CONST PCHAR)m_SlotConfig[ByteCodeSlot].Config.Title);
 
@@ -1346,7 +1351,7 @@ VOID CronusZen::OnReadByteCode(VOID)
 		// Alert the user of the unexpected amount of data returned
 		MainDialog.PrintTimestamp();
 		MainDialog.PrintText(ORANGE, L"An error occured while retrieving the byte code from slot #%u (got %u bytes and expected %u)!\r\n", ByteCodeSlot + 1, ByteCodeReturnedLength, ByteCodeExpectedLength);
-	
+
 		// Notify about slot #8 error
 		if ((ByteCodeSlot == 7) && !ByteCodeReturnedLength) {
 			MainDialog.PrintTimestamp();
@@ -1559,6 +1564,7 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 		std::unique_ptr<StreamIoStatusCommand> StreamIoStatus = std::make_unique<StreamIoStatusCommand>(InputReport);
 		QueueCommand(1, *StreamIoStatus);
 	} else {
+		// Provide message box to user if not on beta firmware
 		MessageBox(MainDialog.GetHwnd(), L"Certain features are unavailable with this firmware version.\r\n\r\nFull application functionality requires a firmware modification.\r\n\r\nGo to \'Firmware\' > \'Install Compatible Firmware\' for instructions.", L"Warning: Incompatible Firmware", MB_ICONHAND | MB_OK);
 	}
 
@@ -1972,46 +1978,18 @@ VOID CronusZen::FlashNextConfig(VOID)
 					memcpy(&FlashConfigData.Unknown3, Unknown3, 44);
 					strcpy_s((PCHAR)FlashConfigData.Title, AnsiTitle.size(), AnsiTitle.c_str());
 				}
-				/*
-				if (m_SlotConfig[i].ConfigFilePath.empty()) {
-					// Initialize variables used for the flash config command
-					std::string AnsiTitle = App->UnicodeToAnsi(m_SlotConfig[i].ByteCodeFile).substr(0, 52);
 
-					// Ensure there's a null-terminator so we don't run into any long name issues
-					AnsiTitle.push_back('\0');
-
-					// Build the flash config command
-					FlashConfigData.GamepackID = 0xffff;
-					FlashConfigData.Flags = 1 + (32 | 2);
-					FlashConfigData.ByteCodeLength = FlashConfigFileSize;
-					memcpy(&FlashConfigData.Unknown3, Unknown3, 44);
-					strcpy_s((PCHAR)FlashConfigData.Title, AnsiTitle.size(), AnsiTitle.c_str());
-				}
-				else {
-					// Alert user to action
-					MainDialog.PrintTimestamp();
-					MainDialog.PrintText(YELLOW, L"Attempting to use existing config for this script from slot #%u...\r\n", i + 1);
-
-					// Create File object for reading config file
-					std::unique_ptr<File> ConfigFile(new File(m_SlotConfig[i].ConfigFilePath, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, FALSE));
-
-					if (!ConfigFile->Open())
-						throw std::wstring(L"An error occured reading " + m_SlotConfig[i].ConfigFilePath + L".");
-
-					if (!ConfigFile->Read(&FlashConfigData, sizeof(SlotConfigData), NULL, NULL))
-						throw std::wstring(L"An error occured reading the file data of the config data for " + m_SlotConfig[i].ConfigFilePath + L".");
-				}
-				*/
 				// Ensure the slot is correct
 				FlashConfigData.Slot = 0x30 + i;
 
 				// Initialize a variable to hold the config data for inserting across each command packet
-				UCHAR Config[508] = { 0 };
+				UCHAR Config[508];
+				memset(&Config, 0, 508);
 				memcpy(&Config, &FlashConfigData, 508);
 
 				// Queue flash config command
 				for (unsigned i = 0; i < 8; i++) {
-					std::unique_ptr<FlashConfigCommand> FlashConfig = std::make_unique<FlashConfigCommand>();
+					std::shared_ptr<FlashConfigCommand> FlashConfig = std::make_shared<FlashConfigCommand>();
 					FlashConfig->InsertData(Config + i * 60, 60);
 					QueueCommand(i == 0 ? 1 : 0, 508, *FlashConfig);
 				}

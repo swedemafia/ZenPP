@@ -33,13 +33,11 @@ BOOL HidDeviceBase::QueryHIDDeviceCapabilities(VOID)
 		m_ReadInputLength = Capabilities.InputReportByteLength;
 		m_WriteOutputLength = Capabilities.OutputReportByteLength;
 
-		// Allocate receive buffer based on the input report length
-		//m_ReceiveBuffer = std::make_unique<UCHAR[]>(m_ReadInputLength);
-
 		// Free preparsed data
 		HidD_FreePreparsedData(PreparsedData);
 
 		return TRUE; // Signal success
+
 	} catch (CONST std::bad_alloc&) {
 		// Handle memory allocation error
 		App->DisplayError(L"Insufficient memory available to complete the required operation.");
@@ -109,7 +107,7 @@ VOID HidDeviceBase::ConnectToDevice(VOID)
 
 		try {
 			// Create new device file handle
-			m_Device = std::make_unique<File>(GetDevicePath(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, FALSE);
+			m_Device = std::make_unique<File>(GetDevicePath(), GENERIC_READ | GENERIC_WRITE, 0, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, FALSE);
 
 			// Attempt to open a connection to the device
 			if (!m_Device->Open())
@@ -147,7 +145,7 @@ VOID HidDeviceBase::AsynchronousRead(VOID)
 	ZeroMemory(GetOverlappedRead(), sizeof(OVERLAPPED));
 
 	// Allocate receive buffer based on the input report length
-	m_ReceiveBuffer = std::make_unique<UCHAR[]>(m_ReadInputLength);
+	m_ReceiveBuffer = std::make_shared<UCHAR[]>(m_ReadInputLength);
 	
 	// Initiate asynchronous read request from the device
 	if (!ReadFile(m_Device->GetHandle(), m_ReceiveBuffer.get(), m_ReadInputLength, nullptr, GetOverlappedRead())) {

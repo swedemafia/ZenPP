@@ -137,15 +137,17 @@ BOOL Program::IsQuitting(VOID) CONST
 // Method for converting an ANSI string to a Unicode string
 CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
 {
-	int BufferSize = MultiByteToWideChar(CP_ACP, 0, String.c_str(), -1, nullptr, 0);
-	if (BufferSize == 0)
-	{
+	// Determine the code page for the current user locale
+	UINT CodePage = GetACP();
+
+	int BufferSize = MultiByteToWideChar(CodePage, 0, String.c_str(), -1, nullptr, 0);
+	if (BufferSize == 0) {
 		DisplayError(L"An error occured while converting an ANSI string to Unicode.");
 		return L"";
 	}
 
 	std::wstring Result(BufferSize - 1, L'\0');
-	MultiByteToWideChar(CP_ACP, 0, String.c_str(), -1, &Result[0], BufferSize);
+	MultiByteToWideChar(CodePage, 0, String.c_str(), -1, &Result[0], BufferSize);
 
 	return Result;
 }
@@ -153,14 +155,39 @@ CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
 // Method for converting raw bytes to a Unicode string
 CONST std::wstring Program::BytesToUnicode(CONST PBYTE& Bytes, CONST UINT BytesSize)
 {
-	std::wstring_convert<std::codecvt_utf16<wchar_t, 0x10FFFF, std::little_endian>> Converter;
-	return Converter.from_bytes(reinterpret_cast<const char*>(Bytes), reinterpret_cast<const char*>(Bytes + BytesSize));
+	// Determine the code page for the current user locale
+	UINT CodePage = GetACP();
+
+	// Calculate the size of the output buffer in wide characters
+	int CharacterCount = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, NULL, 0);
+	if (CharacterCount == 0) {
+		// Handle conversion error
+		throw std::exception("Failed to determine wide character count");
+	}
+
+	// Allocate a buffer to hold the resulting Unicode string
+	std::wstring UnicodeString(CharacterCount, L'\0');
+
+	// Perform the actual conversion
+	int result = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, &UnicodeString[0], CharacterCount);
+	if (result == 0) {
+		// Handle conversion error
+		throw std::exception("Failed to convert bytes to Unicode string");
+	}
+
+	return UnicodeString;
+
+	//std::wstring_convert<std::codecvt_utf16<wchar_t, 0x10FFFF, std::little_endian>> Converter;
+	//return Converter.from_bytes(reinterpret_cast<const char*>(Bytes), reinterpret_cast<const char*>(Bytes + BytesSize));
 }
 
 // Method for converting a Unicode string to an ANSI string
 CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
 {
-	INT BufferSize = WideCharToMultiByte(CP_ACP, 0, String.c_str(), -1, nullptr, 0, nullptr, nullptr);
+	// Determine the code page for the current user locale
+	UINT CodePage = GetACP();
+
+	INT BufferSize = WideCharToMultiByte(CodePage, 0, String.c_str(), -1, nullptr, 0, nullptr, nullptr);
 
 	if (BufferSize == 0) {
 		DisplayError(L"An error occured while converting the Unicode string " + String + L" to ANSI.");
@@ -168,7 +195,7 @@ CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
 	}
 
 	std::string Result(BufferSize - 1, '\0');
-	WideCharToMultiByte(CP_ACP, 0, String.c_str(), -1, &Result[0], BufferSize, nullptr, nullptr);
+	WideCharToMultiByte(CodePage, 0, String.c_str(), -1, &Result[0], BufferSize, nullptr, nullptr);
 
 	return Result;
 }
