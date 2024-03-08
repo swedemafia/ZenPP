@@ -146,7 +146,7 @@ CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
 		return L"";
 	}
 
-	std::wstring Result(BufferSize, L'\0');
+	std::wstring Result(BufferSize - 1, L'\0');
 	MultiByteToWideChar(CodePage, 0, String.c_str(), -1, &Result[0], BufferSize);
 
 	return Result;
@@ -166,7 +166,7 @@ CONST std::wstring Program::BytesToUnicode(CONST PBYTE& Bytes, CONST UINT BytesS
 	}
 
 	// Allocate a buffer to hold the resulting Unicode string
-	std::wstring UnicodeString(CharacterCount, L'\0');
+	std::wstring UnicodeString(CharacterCount - 1, L'\0');
 
 	// Perform the actual conversion
 	int result = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, &UnicodeString[0], CharacterCount);
@@ -194,7 +194,7 @@ CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
 		return "";
 	}
 
-	std::string Result(BufferSize, '\0');
+	std::string Result(BufferSize - 1, '\0');
 	WideCharToMultiByte(CodePage, 0, String.c_str(), -1, &Result[0], BufferSize, nullptr, nullptr);
 
 	return Result;

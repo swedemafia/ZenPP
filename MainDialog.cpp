@@ -607,6 +607,9 @@ INT_PTR MainDialog::OnDeviceChange(CONST WPARAM wParam)
 	if (wParam == DBT_DEVICEARRIVAL) {
 		// Attempt to connect when a device arrives to the system
 		m_CronusZen.ConnectToDevice();
+	} else if (wParam == DBT_DEVICEREMOVECOMPLETE) {
+		// Notify that the device has disconnected
+		m_CronusZen.DisconnectFromDevice();
 	}
 
 	return TRUE;

@@ -105,7 +105,7 @@ DWORD IoCompletionPortBase::IocpEventThreadProc(LPVOID Parameter)
 		if (GetQueuedCompletionStatus(Base->m_IocpHandle, &NumberOfBytesTransferred, &CompletionKey, &Overlapped, INFINITE)) {
 			// Call IOCP event handler to dispatch the event
 			Base->HandleCompletionEvent(NumberOfBytesTransferred, Overlapped);
-		} else if (GetLastError() != WAIT_TIMEOUT) {
+		} else {
 			// Post queued completion status for the client device closing the connection 
 			PostQueuedCompletionStatus(Base->m_IocpHandle, 0, IocpCompletionKey::Disconnect, &Base->m_OverlappedDisconnect.Overlapped);
 		}
