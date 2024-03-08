@@ -598,16 +598,16 @@ std::wstring GetHexRepresentation(CONST BYTE ByteValue)
 	return HexStream.str();
 }
 
-VOID DumpHex(CONST PUCHAR PacketData, CONST USHORT PacketSize) {
-	std::wstring TextToOutput = L"\r\n";
+VOID DumpHex(CONST BOOL Sent, CONST PUCHAR PacketData, CONST USHORT PacketSize) {
+	std::wstring TextToOutput = std::wstring(Sent ? L"Send:" : L"Receive") + L"\r\n";
 
-	for (unsigned j = 0; j < PacketSize; j += 16) {
+	for (unsigned short j = 0; j < PacketSize; j += 16) {
 		// Build hex representation
-		for (unsigned i = 0; i < 16; i++)
+		for (unsigned char i = 0; i < 16; i++)
 			TextToOutput += (i + j < PacketSize) ? GetHexRepresentation(PacketData[i + j]) : L"   ";
 
 		// Build ANSI representation
-		for (unsigned i = 0; i < 16; i++)
+		for (unsigned char i = 0; i < 16; i++)
 			TextToOutput += (i + j < PacketSize) ? GetCharRepresentation(PacketData[i + j]) : L" ";
 
 		// Format (add new line)
@@ -617,7 +617,7 @@ VOID DumpHex(CONST PUCHAR PacketData, CONST USHORT PacketSize) {
 	TextToOutput += L"\r\n\0\0";
 
 	App->GetMainDialog().PrintTimestamp();
-	App->GetMainDialog().PrintText(GRAY, TextToOutput.c_str());
+	App->GetMainDialog().PrintText(Sent ? OLIVE : LIGHTBLUE, TextToOutput.c_str());
 }
 
 BOOL CronusZen::OnRead(CONST DWORD BytesRead)
@@ -671,7 +671,8 @@ BOOL CronusZen::OnRead(CONST DWORD BytesRead)
 
 		// If all packet data has been received, process it
 		if (!BytesRemaining) {
-			//DumpHex(m_PreparseBuffer->Buffer(), m_PreparseBuffer->Size());
+			//if(ID != INPUTREPORT)
+			//DumpHex(FALSE, m_PreparseBuffer->Buffer(), m_PreparseBuffer->Size());
 			HandleReadCommand(m_PreparseBuffer->Buffer(), m_PreparseBuffer->Size());
 			
 		}
@@ -1553,6 +1554,7 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 	// Update main window
 	MainDialog.UpdateSlotsData(m_SlotsUsed, TotalBytes);
 
+	// Determine action based on internal state
 	if (m_ConnectionState == TogglePs4Specialty || m_ConnectionState == ToggleRemotePlay) {
 		CreateWorkerThread(CronusZen::RefreshAttachedDevices);
 	} else {
@@ -1568,6 +1570,7 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 		MessageBox(MainDialog.GetHwnd(), L"Certain features are unavailable with this firmware version.\r\n\r\nFull application functionality requires a firmware modification.\r\n\r\nGo to \'Firmware\' > \'Install Compatible Firmware\' for instructions.", L"Warning: Incompatible Firmware", MB_ICONHAND | MB_OK);
 	}
 
+	// Request byte code after programming the device
 	if (m_ConnectionState == ProgramDevice) {
 		CheckByteCodeFiles();
 	}
@@ -1747,15 +1750,23 @@ VOID CronusZen::OnRequestMkFile(VOID)
 	QueueCommand(1, *GetStatus);
 }
 
+VOID CronusZen::CheckNextWriteCommand(VOID)
+{
+	// Check if there are any remaining commands queued up and send the next one, if so
+	if (!m_Queue.empty())
+		AsynchronousWrite(m_Queue.front());
+}
+
 BOOL CronusZen::OnWrite(CONST DWORD BytesWritten)
 {
 	// Remove command from queue
 	m_Queue.pop_front();
-
+	
 	// Check if there are any remaining commands queued up and send the next one, if so
-	if (!m_Queue.empty())
+	if (!m_Queue.empty()) {
 		AsynchronousWrite(m_Queue.front());
-
+	}
+	
 	return TRUE;
 }
 
@@ -1779,11 +1790,14 @@ VOID CronusZen::QueueCommand(CONST UCHAR Count, CommandBase& Command)
 	// Add packet to queue
 	m_Queue.push_back(OutgoingCommand);
 
+	//DumpHex(TRUE, OutgoingCommand + 1, Command.Size() + 2);
+
 	// Check if command is the only item in queue
 	if (m_Queue.size() == 1) {
 		// If queue was empty, write command immediately
 		AsynchronousWrite(OutgoingCommand);
 	}
+
 }
 
 VOID CronusZen::QueueCommand(CONST UCHAR Count, CONST USHORT Size, CommandBase& Command)
@@ -1805,6 +1819,8 @@ VOID CronusZen::QueueCommand(CONST UCHAR Count, CONST USHORT Size, CommandBase& 
 
 	// Add packet to queue
 	m_Queue.push_back(OutgoingCommand);
+
+	//DumpHex(TRUE, OutgoingCommand + 1, Command.Size() + 2);
 
 	// Check if command is the only item in queue
 	if (m_Queue.size() == 1) {
@@ -1931,7 +1947,7 @@ VOID CronusZen::FlashNextConfig(VOID)
 	SlotConfigData FlashConfigData = { NULL };
 	USHORT FlashConfigFileSize = 0;
 
-	for (unsigned i = 0; i < 8; i++) {
+	for (UCHAR i = 0; i < 8; i++) {
 		if (m_SlotConfig[i].MustFlashConfig) {
 			// Alert user of the action being taken
 			MainDialog.PrintTimestamp();
@@ -1988,9 +2004,9 @@ VOID CronusZen::FlashNextConfig(VOID)
 				memcpy(&Config, &FlashConfigData, 508);
 
 				// Queue flash config command
-				for (unsigned i = 0; i < 8; i++) {
+				for (unsigned char i = 0; i < 8; i++) {
 					std::shared_ptr<FlashConfigCommand> FlashConfig = std::make_shared<FlashConfigCommand>();
-					FlashConfig->InsertData(Config + i * 60, 60);
+					FlashConfig->InsertData(Config + (i * 60), 60);
 					QueueCommand(i == 0 ? 1 : 0, 508, *FlashConfig);
 				}
 
@@ -2010,6 +2026,9 @@ VOID CronusZen::FlashNextConfig(VOID)
 				App->DisplayError(L"Insufficient memory available while attempting to flash the config for " + m_SlotConfig[i].ByteCodeFilePath + L".");
 			} catch (CONST std::wstring& CustomMessage) {
 				App->DisplayError(CustomMessage);
+			}
+			catch (...) {
+				App->DisplayError(L"Unhandled exception caught during FlashNextConfig.");
 			}
 		}
 	}
@@ -2042,7 +2061,7 @@ VOID CronusZen::FlashNextGamepack(VOID)
 	// Variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
 
-	for (unsigned i = 0; i < 8; i++) {
+	for (UCHAR i = 0; i < 8; i++) {
 		if (m_SlotConfig[i].MustFlashGamepack) {
 			// Alert user of the action being taken
 			MainDialog.PrintTimestamp();

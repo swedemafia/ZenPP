@@ -73,6 +73,7 @@ VOID HidDeviceBase::DisconnectFromDevice(VOID)
 			MainDialog.PrintText(RED, L"The connection to the Cronus Zen has been terminated.\r\n");
 			MainDialog.UpdateSlotsData(0, 1);
 			MainDialog.UpdateFeatureAvailability(FALSE);
+			CronusZen.SetConnectionState(CronusZen::Disconnected);
 		}
 		m_Device->Close();
 		m_Device.reset();

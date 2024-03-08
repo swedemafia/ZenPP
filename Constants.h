@@ -34,6 +34,6 @@
 // Version information:
 #define VERSION_MAJOR 3
 #define VERSION_MINOR 1
-#define VERSION_REVISION 6
+#define VERSION_REVISION 7
 
 #endif

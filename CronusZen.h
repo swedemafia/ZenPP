@@ -151,7 +151,7 @@ public:
 		UCHAR Value2;
 	};
 
-
+	VOID CheckNextWriteCommand(VOID);
 
 	// Public method for creating a worker thread to perform a specific action
 	VOID CreateWorkerThread(_In_ CONST ConnectionState& NewState);

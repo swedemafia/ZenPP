@@ -26,6 +26,7 @@ public:
 	CONST BOOL AssociateWithIocp(_In_ CONST HANDLE FileHandle);
 	VOID CancelIocp(VOID);
 
+
 protected:
 	// Protected methods for IOCP information retrieval
 	CONST HANDLE GetIocpHandle(VOID) CONST;
