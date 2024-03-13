@@ -72,6 +72,10 @@ BOOLEAN Program::InitializeProgram(VOID)
 		// Initialize objects
 		m_CronusZen = std::make_unique<CronusZen>();
 		m_MainDialog = std::make_unique<MainDialog>();
+		m_Registry = std::make_unique<Registry>(L"Software\\Asgard Productions\\Zen++\\");
+
+		// Read configuration data
+		ReadUserVariables();
 
 		// Delete update and download files
 		DeleteFile(L"Zen.exe");
@@ -104,11 +108,13 @@ BOOLEAN Program::InitializeProgram(VOID)
 		if (!m_VersionCheck.get())
 			EnableMenuItem(GetMainDialog().GetMenuHandle(), MENU_HELP_NEWS, MF_BYCOMMAND | MF_DISABLED);
 
-		// Perform version check based on build version
-		m_CronusZen->ConnectToDevice();
-#ifndef _DEBUG
+		// Check for connect on startup
+		if(GetConnectOnStartup())
+			m_CronusZen->ConnectToDevice();
+
+//#ifndef _DEBUG
 		m_VersionCheck->CheckUpdatesAndNews();
-#endif
+//#endif
 
 	}
 	catch (CONST std::wstring& CustomMessage)
@@ -134,19 +140,80 @@ BOOL Program::IsQuitting(VOID) CONST
 	return m_Quitting;
 }
 
+CONST BOOL Program::GetBlackBackground(VOID) CONST
+{
+	return m_BlackBackground;
+}
+
+CONST BOOL Program::GetConnectOnStartup(VOID) CONST
+{
+	return m_ConnectOnStartup;
+}
+
+CONST BOOL Program::GetDisplayVMSpeed(VOID) CONST
+{
+	return m_DisplayVMSpeed;
+}
+
+CONST BOOL Program::GetDisplay24HourTimestamps(VOID) CONST
+{
+	return m_24HourTimestamps;
+}
+
+CONST BOOL Program::GetLowPerformanceMode(VOID) CONST
+{
+	return m_LowPerformanceMode;
+}
+
+VOID Program::SetBlackBackground(CONST BOOL Value)
+{
+	m_Registry->SetValue(L"Black Background", Value);
+	m_BlackBackground = Value;
+}
+
+VOID Program::SetConnectOnStartup(CONST BOOL Value)
+{
+	m_Registry->SetValue(L"Connect on Startup", Value);
+	m_ConnectOnStartup = Value;
+}
+
+VOID Program::SetDisplayVMSpeed(CONST BOOL Value)
+{
+	m_Registry->SetValue(L"Display VM Speed", Value);
+	m_DisplayVMSpeed = Value;
+}
+
+VOID Program::SetDisplay24HourTimestamps(CONST BOOL Value)
+{
+	m_Registry->SetValue(L"Display 24-hour Timestamps", Value);
+	m_24HourTimestamps = Value;
+}
+
+VOID Program::SetLowPerformanceMode(CONST BOOL Value)
+{
+	m_Registry->SetValue(L"Low Performance Mode", Value);
+	m_LowPerformanceMode = Value;
+}
+
 // Method for converting an ANSI string to a Unicode string
 CONST std::wstring Program::AnsiToUnicode(CONST std::string& String)
 {
 	// Determine the code page for the current user locale
 	UINT CodePage = GetACP();
 
+	// Calculate the size of the output buffer in wide characters
 	int BufferSize = MultiByteToWideChar(CodePage, 0, String.c_str(), -1, nullptr, 0);
+
+	// Validate size of buffer
 	if (BufferSize == 0) {
 		DisplayError(L"An error occured while converting an ANSI string to Unicode.");
 		return L"";
 	}
 
+	// Allocate a buffer to hold the resulting Unicode string
 	std::wstring Result(BufferSize - 1, L'\0');
+
+	// Perform the actual conversion
 	MultiByteToWideChar(CodePage, 0, String.c_str(), -1, &Result[0], BufferSize);
 
 	return Result;
@@ -159,26 +226,27 @@ CONST std::wstring Program::BytesToUnicode(CONST PBYTE& Bytes, CONST UINT BytesS
 	UINT CodePage = GetACP();
 
 	// Calculate the size of the output buffer in wide characters
-	int CharacterCount = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, NULL, 0);
-	if (CharacterCount == 0) {
+	int BufferSize = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, NULL, 0);
+
+	// Validate size of buffer
+	if (BufferSize == 0) {
 		// Handle conversion error
 		throw std::exception("Failed to determine wide character count");
 	}
 
 	// Allocate a buffer to hold the resulting Unicode string
-	std::wstring UnicodeString(CharacterCount - 1, L'\0');
+	std::wstring UnicodeString(BufferSize - 1, L'\0');
 
 	// Perform the actual conversion
-	int result = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, &UnicodeString[0], CharacterCount);
-	if (result == 0) {
+	int Result = MultiByteToWideChar(CodePage, 0, reinterpret_cast<const char*>(Bytes), BytesSize, &UnicodeString[0], BufferSize);
+
+	// Validate result
+	if (Result == 0) {
 		// Handle conversion error
 		throw std::exception("Failed to convert bytes to Unicode string");
 	}
 
 	return UnicodeString;
-
-	//std::wstring_convert<std::codecvt_utf16<wchar_t, 0x10FFFF, std::little_endian>> Converter;
-	//return Converter.from_bytes(reinterpret_cast<const char*>(Bytes), reinterpret_cast<const char*>(Bytes + BytesSize));
 }
 
 // Method for converting a Unicode string to an ANSI string
@@ -187,14 +255,19 @@ CONST std::string Program::UnicodeToAnsi(CONST std::wstring& String)
 	// Determine the code page for the current user locale
 	UINT CodePage = GetACP();
 
+	// Calculate the size of the buffer in ANSI characters
 	INT BufferSize = WideCharToMultiByte(CodePage, 0, String.c_str(), -1, nullptr, 0, nullptr, nullptr);
 
+	// Validate size of buffer
 	if (BufferSize == 0) {
 		DisplayError(L"An error occured while converting the Unicode string " + String + L" to ANSI.");
 		return "";
 	}
 
+	// Allocate a buffer to hold the resulting ANSI string
 	std::string Result(BufferSize - 1, '\0');
+
+	// Perform the actual conversion
 	WideCharToMultiByte(CodePage, 0, String.c_str(), -1, &Result[0], BufferSize, nullptr, nullptr);
 
 	return Result;
@@ -210,8 +283,7 @@ INT Program::RunMessageLoop(VOID)
 	MSG Message = { NULL };
 	HACCEL Accelerator = LoadAccelerators(m_Instance, MAKEINTRESOURCE(ACCELERATOR_ZENPP));
 
-	try
-	{
+	try {
 		// Validate accelerator table was loaded
 		if (!Accelerator)
 			throw std::wstring(L"An error occured while initializing keyboard shortcuts.  Please restart the application or contact support for assistance.");
@@ -226,9 +298,8 @@ INT Program::RunMessageLoop(VOID)
 
 		// Free the accelerator table
 		DestroyAcceleratorTable(Accelerator);
-	}
-	catch (CONST std::wstring& CustomMessage)
-	{
+
+	} catch (CONST std::wstring& CustomMessage) {
 		DisplayError(CustomMessage);
 	}
 
@@ -244,12 +315,16 @@ VOID Program::QuitProgram(VOID)
 
 VOID Program::CreateFirmwareDialog(CONST FirmwareManager::FirmwareModificationPurpose Purpose)
 {
-	try
-	{
-		m_FirmwareDialog = std::make_unique<FirmwareDialog>(Purpose);
-		m_FirmwareDialog->Create(DIALOG_FIRMWARE);
+	try {
+		// Check if dialog already exists and display it, if so; otherwise create and display it
+		if (m_FirmwareDialog.get()) {
+			m_FirmwareDialog->BringToForeground();
+		} else {
+			m_FirmwareDialog = std::make_unique<FirmwareDialog>(Purpose);
+			m_FirmwareDialog->Create(DIALOG_FIRMWARE);
+		}
 	}
-	catch (std::bad_alloc&) {
+	catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Unable to create the FirmwareDialog object; insufficient memory is available to complete the required operation.");
 	}
 }
@@ -271,8 +346,7 @@ VOID Program::CheckAdministrator(VOID)
 	PSID AdministratorsGroup;
 
 	// Allocate and initialize a SID of the administrators group
-	if (AllocateAndInitializeSid(&NtAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &AdministratorsGroup))
-	{
+	if (AllocateAndInitializeSid(&NtAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &AdministratorsGroup)) {
 		// Check if the calling process is a member of the administrators group
 		if (!CheckTokenMembership(NULL, AdministratorsGroup, &m_Administrator))
 			m_Administrator = FALSE;
@@ -299,16 +373,18 @@ VOID Program::DisplayError(CONST std::wstring& AdditionalMessage)
 	if (m_MainDialog == nullptr) {
 		// Append system error (if applicable)
 		if (HasSystemMessage) {
-			if (AdditionalMessage.size()) {
+			// Verify an additional system message exists and if so, append it
+			if (AdditionalMessage.size())
 				ErrorMessage += L"\r\n\r\n";
-			}
+
+			// Append the system message whether blank or not
 			ErrorMessage += SystemError;
 		}
 
 		// Alert error
 		MessageBox(NULL, ErrorMessage.c_str(), L"Zen++ Error", MB_ICONERROR | MB_OK);
-	}
-	else {
+
+	} else {
 		// Display error
 		if (ErrorMessage.size()) {
 			m_MainDialog->PrintTimestamp();
@@ -339,7 +415,9 @@ VOID Program::HandleCreateDirectoryError(CONST std::wstring& Directory)
 	switch (ErrorCode) {
 	case ERROR_ALREADY_EXISTS:
 		// Folder already exists, no action needed
+
 		break;
+
 	case ERROR_ACCESS_DENIED:
 		// Permission issues:
 		// - Inform user about insufficient permissions
@@ -352,7 +430,9 @@ VOID Program::HandleCreateDirectoryError(CONST std::wstring& Directory)
 		MainDialog.PrintText(ORANGE, L"Please make sure you have removed this application from your Downloads folder and placed it somewhere else such as its own folder on your Desktop.\r\n");
 		MainDialog.DisplaySupportInfo();
 		throw std::wstring(L"");
+
 		break;
+
 	case ERROR_ELEVATION_REQUIRED:
 		// Administrative privileges required:
 		// - Inform the user about the need for administrative privileges
@@ -364,27 +444,37 @@ VOID Program::HandleCreateDirectoryError(CONST std::wstring& Directory)
 		MainDialog.DisplayAdministratorStatus();
 		MainDialog.DisplaySupportInfo();
 		throw std::wstring(L"");
+
 		break;
+
 	default:
 		// Handle any other error that may arrise
 		throw std::wstring(L"An error occured while creating the " + Directory + L" folder.");
 	}
 }
 
+// Method used for reading the user's configuration for the application from the Windows Registry
+VOID Program::ReadUserVariables(VOID)
+{
+	m_24HourTimestamps = m_Registry->GetDword(L"Display 24-hour Timestamps", 0);
+	m_DisplayVMSpeed = m_Registry->GetDword(L"Display VM Speed", 1);
+	m_BlackBackground= m_Registry->GetDword(L"Black Background", 1);
+	m_ConnectOnStartup = m_Registry->GetDword(L"Connect on Startup", 1);
+	m_LowPerformanceMode = m_Registry->GetDword(L"Low Performance Mode", 0);
+}
+
 VOID Program::ShowAboutDialog(VOID)
 {
-	try
-	{
+	try {
+		// Check if dialog already exists and display it, if so; otherwise create and display it
 		if (m_AboutDialog.get()) {
 			m_AboutDialog->BringToForeground();
-		}
-		else {
+		} else {
 			m_AboutDialog = std::make_unique<AboutDialog>();
 			m_AboutDialog->Create(DIALOG_ABOUT);
 		}
-	}
-	catch (CONST std::bad_alloc&)
-	{
+
+	} catch (CONST std::bad_alloc&) {
 		App->DisplayError(L"Unable to create the AboutDialog object; insufficient memory is available to complete the required operation.");
 	}
 }

@@ -65,7 +65,9 @@ private:
 	INT_PTR OnCommandMainSoftReset(VOID);
 
 	// 'Connection' menu
+	INT_PTR OnCommandConnectionConnectOnStartup(VOID);
 	INT_PTR OnCommandConnectionDisconnect(VOID);
+	INT_PTR OnCommandConnectionLowPerformanceMode(VOID);
 	INT_PTR OnCommandConnectionReconnect(VOID);
 
 	// 'Device' menu
@@ -82,7 +84,6 @@ private:
 	INT_PTR OnCommandDeviceEopPcMobileXbox360(VOID);
 	INT_PTR OnCommandDeviceEopPlayStation3(VOID);
 	INT_PTR OnCommandDeviceEopPlayStation4(VOID);
-	INT_PTR OnCommandDeviceEopPlayStation5(VOID);
 	INT_PTR OnCommandDeviceEopXboxOne(VOID);
 
 	// 'Device' -> 'Operational Mode' submenu
@@ -109,9 +110,15 @@ private:
 	INT_PTR OnCommandHelpAbout(VOID);
 	INT_PTR OnCommandHelpZenPPNews(VOID);
 
+	// 'View' menu
+	INT_PTR OnCommandViewBlackBackground(VOID);
+	INT_PTR OnCommandViewDisplay24HourTimestamps(VOID);
+	INT_PTR OnCommandViewDisplayVMSpeed(VOID);
+
 	// Private methods for handling specific window messages
 	INT_PTR OnClose(VOID);
 	INT_PTR OnCommand(_In_ CONST WPARAM wParam, _In_ CONST LPARAM lParam);
+	INT_PTR OnCtlColorDlg(_In_ CONST WPARAM wParam);
 	INT_PTR OnCtlColorListBox(_In_ CONST WPARAM wParam);
 	INT_PTR OnCtlColorStatic(_In_ CONST WPARAM wParam);
 	INT_PTR OnDeviceChange(_In_ CONST WPARAM wParam);

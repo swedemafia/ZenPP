@@ -111,7 +111,7 @@ DWORD DialogBase::EditStreamCallback(DWORD_PTR dwCookie, LPBYTE pbBuff, LONG cbB
 	// Determine if there's any data to be streamed
 	if (OutputStream->Length) {
 		// Calculate how many characters can be read
-		DWORD CharactersToRead = min(OutputStream->Length, cbBuff);
+		DWORD CharactersToRead = min((unsigned)OutputStream->Length, (unsigned)cbBuff);
 
 		// Copy Unicode characters to the buffer
 		memcpy(pbBuff, OutputStream->Text, CharactersToRead << 1);
@@ -235,7 +235,7 @@ VOID DialogBase::PrintTimestamp(VOID)
 	GetLocalTime(&SystemTime);
 
 	// Format and print the timestamp in the color gray
-	PrintText(GRAY, L"[%02u:%02u:%02u] ", SystemTime.wHour, SystemTime.wMinute, SystemTime.wSecond);
+	PrintText(GRAY, L"[%02u:%02u:%02u] ", App->GetDisplay24HourTimestamps() ? SystemTime.wHour : (SystemTime.wHour % 12), SystemTime.wMinute, SystemTime.wSecond);
 }
 
 // Method for printing colored and formatted text to the dialog's RichEdit text box

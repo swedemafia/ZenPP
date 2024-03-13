@@ -174,6 +174,10 @@ VOID HidDeviceBase::AsynchronousWrite(CONST PUCHAR Data)
 		}
 	}
 
+	// Check for low performance mode
+	if (App->GetLowPerformanceMode())
+		Sleep(1);
+
 	// Free memory that was previously allocated prior to being passed to this method
 	delete[] Data;
 }

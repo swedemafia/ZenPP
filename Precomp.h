@@ -39,6 +39,7 @@
 #include "File.h"
 #include "ParseBuffer.h"
 #include "PopupMenu.h"
+#include "Registry.h"
 #include "ResourceFile.h"
 #include "SemanticVersion.h"
 #include "StoreBuffer.h"
@@ -64,6 +65,7 @@
 #include "CodeDialog.h"
 #include "FirmwareDialog.h"
 #include "MainDialog.h"
+#include "MkSettingsDialog.h"
 
 // Zen++:
 #include "BuildDateTime.h"

@@ -69,6 +69,7 @@ private:
 		UCHAR Input;
 	};
 
+	// Mapping -> Controller
 	struct LayoutAnalogT {
 		XimAnalogs KeyAnalogLx;
 		XimAnalogs KeyAnalogLy;
@@ -94,6 +95,7 @@ private:
 		USHORT DeActDelay;
 	};
 
+	// Aim Settings -> Tuning
 	struct LayoutCfgAimT {
 		USHORT Sensitivity;
 		USHORT XYRatio;
@@ -114,6 +116,7 @@ private:
 		UCHAR Inherit;
 	};
 
+	// Mapping -> Movement
 	struct LayoutCfgMovementT {
 		InputT LKeyUp;
 		InputT LKeyLeft;
@@ -157,6 +160,7 @@ private:
 		LayoutKeyMapsT Secondary;
 	};
 
+	// Aim Settings -> Translator
 	struct LayoutTranslatorT {
 		UCHAR DzShape;
 		USHORT DzX;

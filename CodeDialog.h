@@ -7,6 +7,10 @@
 
 class CodeDialog : public DialogBase
 {
+public:
+	// Destructor for cleanup
+	~CodeDialog() = default;
+
 protected:
 	// Protected callback method for central window message processing
 	INT_PTR CALLBACK HandleMessage(_In_ CONST UINT Message, _In_ CONST WPARAM wParam, _In_ CONST LPARAM lParam);

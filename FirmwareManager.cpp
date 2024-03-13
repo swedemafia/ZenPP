@@ -90,7 +90,7 @@ DWORD FirmwareManager::EraseFirmwareThreadProc(LPVOID Parameter)
 
 		// Get status and wait
 		if (Manager->GetStatusAndWait().State != DfuController::Idle)
-			throw std::wstring(L"An error occured while unlocking the device firmware (1).");
+			throw std::wstring(L"An error occured while unlocking the device firmware (1).\r\n\r\nPerform action \"Firmware > Erase Firmware\" then try this operation again.");
 
 		// Update Progress bar
 		BytesProcessed += 0x70;
@@ -181,7 +181,7 @@ DWORD FirmwareManager::InstallFirmwareThreadProc(LPVOID Parameter)
 
 		// Get status and wait
 		if (Manager->GetStatusAndWait().State != DfuController::Idle)
-			throw std::wstring(L"An error occured while unlocking the firmware on the device (2).");
+			throw std::wstring(L"An error occured while unlocking the firmware on the device (2).\r\n\r\nPerform action \"Firmware > Erase Firmware\" then try this operation again.");
 
 		// Update Progress bar
 		BytesProcessed += 0x70;

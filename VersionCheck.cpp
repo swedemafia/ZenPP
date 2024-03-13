@@ -24,9 +24,14 @@ VOID VersionCheck::DisplayNews(VOID) CONST
 	// Initialize variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
 
-	for (const auto NewsItem : m_News) {
+	if (m_News.size()) {
+		for (const auto NewsItem : m_News) {
+			MainDialog.PrintTimestamp();
+			MainDialog.PrintText(LIGHTGREEN, L"%ws\r\n", NewsItem.c_str());
+		}
+	} else {
 		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(LIGHTGREEN, L"%ws\r\n", NewsItem.c_str());
+		MainDialog.PrintText(ORANGE, L"There is no news available to display.\r\n");
 	}
 }
 
@@ -74,7 +79,7 @@ VOID VersionCheck::ProcessVersionCommand(CONST std::string_view VersionString)
 	CHAR Revision = VersionInfo->GetRevision();
 	MainDialog* Main = &App->GetMainDialog();
 
-	if ((Major > VERSION_MAJOR) || (Minor > VERSION_MINOR) || (Revision > VERSION_REVISION)) {
+	if ((Major > VERSION_MAJOR) || (Major >= VERSION_MAJOR && Minor > VERSION_MINOR) || (Major >= VERSION_MAJOR && Minor >= VERSION_MINOR && Revision > VERSION_REVISION)) {
 		Main->PrintTimestamp();
 		Main->PrintText(PINK, L"New version available: %u.%u.%u.\r\n", Major, Minor, Revision);
 

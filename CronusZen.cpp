@@ -813,8 +813,8 @@ VOID CronusZen::OnFragmentRead(VOID)
 	MainDialog& MainDialog = App->GetMainDialog();
 
 	// Notify user that the slots configuration is being processed
-	MainDialog.PrintTimestamp();
-	MainDialog.PrintText(TEAL, L"Processing device configuration data...\r\n");
+	//MainDialog.PrintTimestamp();
+	//MainDialog.PrintText(TEAL, L"Processing device configuration data...\r\n");
 
 	// Validate length of fragment data and retry if necessary
 	// - Ensures that the received fragment data is the expected size (60 bytes)
@@ -1192,10 +1192,10 @@ VOID CronusZen::OnInputReport(VOID)
 		}
 
 		// Check for VM speed update
-		if (InputReport.VmSpeedValue != m_LastInputReport.VmSpeedValue) {
-			if (m_LastInputReport.VmSpeedValue > 0) {
+		if (App->GetDisplayVMSpeed() && (InputReport.VmSpeedValue != m_LastInputReport.VmSpeedValue)) {
+			if (m_LastInputReport.VmSpeedValue >= 0) {
 				MainDialog.PrintTimestamp();
-				MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen is now operating at %ums.\r\n", InputReport.VmSpeedValue);
+				MainDialog.PrintText(LIGHTBLUE, L"Cronus Zen VM speed is now %ums.\r\n", InputReport.VmSpeedValue);
 			}
 		}
 	}
@@ -1392,8 +1392,8 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 
 	if (m_ConnectionState != DeviceCleanup) {
 		// Notify user that the slots configuration is being processed
-		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(TEAL, L"Processing slots configuration data...\r\n");
+		//MainDialog.PrintTimestamp();
+		//MainDialog.PrintText(TEAL, L"Processing slots configuration data...\r\n");
 	} else {
 		// Allow features to be used again
 		MainDialog.UpdateFeatureAvailability(TRUE);
@@ -1548,7 +1548,7 @@ VOID CronusZen::OnReadSlotsCfg(VOID)
 	} else {
 		// Print slots usage information
 		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(YELLOW, L"%u slot%ws using %u bytes of storage with %u bytes of storage available.\r\n", m_SlotsUsed, m_SlotsUsed > 1 ? L"s" : L"", TotalBytes, 262136 - TotalBytes);
+		MainDialog.PrintText(YELLOW, L"%u slot%ws using %u bytes of memory with %u bytes of storage available.\r\n", m_SlotsUsed, m_SlotsUsed > 1 ? L"s" : L"", TotalBytes, 262136 - TotalBytes);
 	}
 
 	// Update main window
@@ -1587,8 +1587,8 @@ VOID CronusZen::OnRequestAttachedDevices(VOID)
 
 	if (m_ConnectionState != TogglePs4Specialty && m_ConnectionState != ToggleRemotePlay) {
 		// Notify user that the valid is indeed valid and will be processed
-		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(TEAL, L"Processing attached devices and Bluetooth connection data...\r\n");
+		//MainDialog.PrintTimestamp();
+		//MainDialog.PrintText(TEAL, L"Processing attached devices and Bluetooth connection data...\r\n");
 
 		// Validate length of attached devices and retry if necessary
 		// - Ensures that the received attached devices data is the expected size (96 bytes)
@@ -1723,8 +1723,8 @@ VOID CronusZen::OnRequestMkFile(VOID)
 	// Ensure the parse buffer contains enough data for a valid mouse and keyboard settings file
 	if (m_PayloadLength == 1283) {
 		// Notify user that the valid is indeed valid and will be processed
-		MainDialog.PrintTimestamp();
-		MainDialog.PrintText(TEAL, L"Processing mouse and keyboard settings data...\r\n");
+		//MainDialog.PrintTimestamp();
+		//MainDialog.PrintText(TEAL, L"Processing mouse and keyboard settings data...\r\n");
 
 		// Create MkFile object to manage the mouse and keyboard settings file
 		m_MkFile = std::make_unique<MkFile>();
@@ -1914,7 +1914,7 @@ VOID CronusZen::SlotsAdd(VOID)
 		// Update internal slots config for programming
 		m_SlotConfig[SlotToWrite].ByteCodeFile = StrFilePath;
 		m_SlotConfig[SlotToWrite].ByteCodeFilePath = ListBoxItem->Path;
-		m_SlotConfig[SlotToWrite].ConfigFilePath = L"";
+		m_SlotConfig[SlotToWrite].ConfigFilePath = ListBoxItem->Path.substr(0, ListBoxItem->Path.size() - 4) + L".dat";
 		m_SlotConfig[SlotToWrite].NeedByteCode = FALSE;
 		m_SlotConfig[SlotToWrite].MustFlashConfig = TRUE;
 		m_SlotConfig[SlotToWrite].MustFlashGamepack = TRUE;
@@ -1951,7 +1951,7 @@ VOID CronusZen::FlashNextConfig(VOID)
 		if (m_SlotConfig[i].MustFlashConfig) {
 			// Alert user of the action being taken
 			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GRAY, L"Attempting to flash config on slot #%u for %ws...\r\n", i + 1, m_SlotConfig[i].ByteCodeFile.c_str());
+			MainDialog.PrintText(GRAY, L"Attempting to flash config for slot #%u...\r\n", i + 1);
 
 			try {
 				std::unique_ptr<File> ScriptFile = std::make_unique<File>(m_SlotConfig[i].ByteCodeFilePath);
@@ -1971,7 +1971,7 @@ VOID CronusZen::FlashNextConfig(VOID)
 				if (ConfigFile->Exists()) {
 					// Alert user to action
 					MainDialog.PrintTimestamp();
-					MainDialog.PrintText(YELLOW, L"Attempting to use existing config for this script from its previous slot...\r\n");
+					MainDialog.PrintText(TEAL, L"Existing config data was located for this script.\r\n");
 
 					if (ConfigFile->Open()) {
 						if (!ConfigFile->Read(&FlashConfigData, sizeof(SlotConfigData), NULL, NULL))
@@ -2065,7 +2065,7 @@ VOID CronusZen::FlashNextGamepack(VOID)
 		if (m_SlotConfig[i].MustFlashGamepack) {
 			// Alert user of the action being taken
 			MainDialog.PrintTimestamp();
-			MainDialog.PrintText(GRAY, L"Attempting to flash slot #%u with file %ws...\r\n", i + 1, m_SlotConfig[i].ByteCodeFile.c_str());
+			MainDialog.PrintText(GRAY, L"Attempting to flash %ws to slot #%u...%ws\r\n", m_SlotConfig[i].ByteCodeFile.c_str(), i + 1, App->GetLowPerformanceMode() ? L"this may take a moment; please wait..." : L"");
 
 			try {
 				std::unique_ptr<File> ScriptFile = std::make_unique<File>(m_SlotConfig[i].ByteCodeFilePath);

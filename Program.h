@@ -51,12 +51,27 @@ public:
 	CONST std::wstring AnsiToUnicode(_In_ CONST std::string& String);
 	CONST std::wstring BytesToUnicode(_In_ CONST PBYTE& Bytes, _In_ CONST UINT BytesSize);
 
+	// Public methods for retieving user variables
+	CONST BOOL GetBlackBackground(VOID) CONST;
+	CONST BOOL GetConnectOnStartup(VOID) CONST;
+	CONST BOOL GetDisplayVMSpeed(VOID) CONST;
+	CONST BOOL GetDisplay24HourTimestamps(VOID) CONST;
+	CONST BOOL GetLowPerformanceMode(VOID) CONST;
+
+	// Public methods for setting user variables
+	VOID SetBlackBackground(_In_ CONST BOOL Value);
+	VOID SetConnectOnStartup(_In_ CONST BOOL Value);
+	VOID SetDisplayVMSpeed(_In_ CONST BOOL Value);
+	VOID SetDisplay24HourTimestamps(_In_ CONST BOOL Value);
+	VOID SetLowPerformanceMode(_In_ CONST BOOL Value);
+
 private:
 	// Private members for program objects, state and resources
 	std::unique_ptr<AboutDialog> m_AboutDialog;
 	std::unique_ptr<CronusZen> m_CronusZen;
 	std::unique_ptr<FirmwareDialog> m_FirmwareDialog;
 	std::unique_ptr<MainDialog> m_MainDialog;
+	std::unique_ptr<Registry> m_Registry;
 	std::unique_ptr<VersionCheck> m_VersionCheck;
 	BOOL m_Administrator = FALSE;
 	BOOL m_Updated = FALSE;
@@ -65,8 +80,16 @@ private:
 	HINSTANCE m_Instance = NULL;
 	HMODULE m_RichEdit = NULL;
 
+	// User variables:
+	BOOL m_24HourTimestamps = FALSE;
+	BOOL m_BlackBackground = FALSE;
+	BOOL m_ConnectOnStartup = FALSE;
+	BOOL m_DisplayVMSpeed = FALSE;
+	BOOL m_LowPerformanceMode = FALSE;
+
 	// Private method for checking administrator privileges
 	VOID CheckAdministrator(VOID);
+	VOID ReadUserVariables(VOID);
 };
 
 extern std::unique_ptr<Program> App;

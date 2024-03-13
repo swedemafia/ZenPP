@@ -40,7 +40,7 @@ VOID MainDialog::DisplayAdministratorStatus(VOID)
 VOID MainDialog::DisplayStartupInfo(VOID)
 {
 	// Set dialog caption
-	SetTitle(L"Zen++ Copyright © 2023-2024 Swedemafia");
+	SetTitle(L"Zen++ Copyright © 2023-2024 Swedemafia (Version " + std::to_wstring(VERSION_MAJOR) + L"." + std::to_wstring(VERSION_MINOR) + L"." + std::to_wstring(VERSION_REVISION) + L")");
 
 	// Display greeting
 	PrintTimestamp();
@@ -117,10 +117,8 @@ VOID MainDialog::UpdateDeviceMenu(_In_ CONST CronusZen::SettingsLayout& Settings
 		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION3, Checked);
 		break;
 	case CronusZen::PlayStation4:
-		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION4, Checked);
-		break;
 	case CronusZen::PlayStation5:
-		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION5, Checked);
+		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION4, Checked);
 		break;
 	case CronusZen::Xbox360:
 		CheckMenuItem(m_Menu, MENU_DEVICE_EOP_PCMOBILEXBOX360, Checked);
@@ -155,9 +153,6 @@ VOID MainDialog::UpdateDeviceMenu(_In_ CONST CronusZen::SettingsLayout& Settings
 		CheckMenuItem(m_Menu, MENU_DEVICE_RSC_PSL3, Checked);
 		break;
 	}
-
-	// Check for PlayStation 5 option disable
-	EnableMenuItem(m_Menu, MENU_DEVICE_EOP_PLAYSTATION5, MF_BYCOMMAND | (m_CronusZen.GetFirmwareVersion().IsBeta() ? MF_DISABLED : MF_ENABLED));
 }
 
 // Method to enable/disable features based on the connection state
@@ -173,7 +168,7 @@ VOID MainDialog::UpdateFeatureAvailability(CONST BOOL Enabled)
 	DrawMenuBar(m_hWnd);
 
 	// Enable/disable buttons based on the connection state
-	for (unsigned i = BUTTON_MAIN_ADDSCRIPT; i <= BUTTON_MAIN_PROGRAMDEVICE; i++)
+	for (unsigned i = BUTTON_MAIN_ADDSCRIPT; i <= BUTTON_MAIN_SOFTRESET; i++)
 		EnableWindow(GetDlgItem(m_hWnd, i), Enabled);
 }
 
@@ -197,7 +192,7 @@ VOID MainDialog::UpdateSlotsData(CONST UCHAR SlotsUsed, CONST UINT BytesUsed)
 	} else {
 		// Format string with proper pluralization for slots and byte count
 		SlotsString = std::to_wstring(SlotsUsed) + L" slot" + ((SlotsUsed > 1) ? L"s" : L"");
-		SlotsString += L" (" + std::to_wstring(BytesUsed) + L" used, " + std::to_wstring(262136 - BytesUsed) + L" free)";
+		SlotsString += L" " + std::to_wstring(BytesUsed) + L" used, " + std::to_wstring(262136 - BytesUsed) + L" free";
 	}
 
 	// UIpdate the edit box caption with the formatted slots information
@@ -216,6 +211,7 @@ INT_PTR MainDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONST
 	switch (Message) {
 	case WM_CLOSE:									return Dialog->OnClose();
 	case WM_COMMAND:								return Dialog->OnCommand(wParam, lParam);
+	case WM_CTLCOLORDLG:							return Dialog->OnCtlColorDlg(wParam);
 	case WM_CTLCOLORLISTBOX:						return Dialog->OnCtlColorListBox(wParam);
 	case WM_CTLCOLORSTATIC:							return Dialog->OnCtlColorStatic(wParam);
 	case WM_DESTROY:								return Dialog->OnDestroy();
@@ -241,8 +237,9 @@ INT_PTR MainDialog::OnClose(VOID)
 		Cronus.QueueCommand(1, *ExitApiMode);
 	}
 
-	// Destroy dialog
+	// Destroy dialog and terminate the process
 	DestroyWindow(m_hWnd);
+	ExitProcess(0);
 
 	return TRUE;
 }
@@ -259,7 +256,9 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	case BUTTON_MAIN_SOFTRESET:						return OnCommandMainSoftReset();
 
 	// 'Connection'
+	case MENU_CONNECTION_CONNECTONSTARTUP:			return OnCommandConnectionConnectOnStartup();
 	case MENU_CONNECTION_DISCONNECT:				return OnCommandConnectionDisconnect();
+	case MENU_CONNECTION_LOWPERFORMANCEMODE:		return OnCommandConnectionLowPerformanceMode();
 	case MENU_CONNECTION_RECONNECT:					return OnCommandConnectionReconnect();
 
 	// 'Device'
@@ -276,7 +275,6 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	case MENU_DEVICE_EOP_PCMOBILEXBOX360:			return OnCommandDeviceEopPcMobileXbox360();
 	case MENU_DEVICE_EOP_PLAYSTATION3:				return OnCommandDeviceEopPlayStation3();
 	case MENU_DEVICE_EOP_PLAYSTATION4:				return OnCommandDeviceEopPlayStation4();
-	case MENU_DEVICE_EOP_PLAYSTATION5:				return OnCommandDeviceEopPlayStation5();
 	case MENU_DEVICE_EOP_XBOXONEX:					return OnCommandDeviceEopXboxOne();
 
 	// 'Device' -> 'Operational Mode'
@@ -301,6 +299,11 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	// 'Help'
 	case MENU_HELP_ABOUT:							return OnCommandHelpAbout();
 	case MENU_HELP_NEWS:							return OnCommandHelpZenPPNews();
+
+	// 'View'
+	case MENU_VIEW_24HOURTIMESTAMPS:				return OnCommandViewDisplay24HourTimestamps();
+	case MENU_VIEW_BLACKBACKGROUND:					return OnCommandViewBlackBackground();
+	case MENU_VIEW_DISPLAYVMSPEED:					return OnCommandViewDisplayVMSpeed();
 	}
 	return FALSE;
 }
@@ -391,10 +394,79 @@ INT_PTR MainDialog::OnCommandMainSoftReset(VOID)
 	return TRUE;
 }
 
+INT_PTR MainDialog::OnCommandViewBlackBackground(VOID)
+{
+	BOOL BlackBackground = !App->GetBlackBackground();
+
+	// Update value and save to Windows Registry
+	App->SetBlackBackground(BlackBackground);
+
+	// Update the menu item
+	CheckMenuItem(m_Menu, MENU_VIEW_BLACKBACKGROUND, BlackBackground ? MF_CHECKED : MF_UNCHECKED);
+
+	// Update the dialog
+	SetBkColor(GetDC(m_hWnd), BlackBackground ? BLACK : GetSysColor(COLOR_BTNFACE));
+	InvalidateRect(m_hWnd, NULL, TRUE);
+
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandViewDisplay24HourTimestamps(VOID)
+{
+	BOOL Display24HourTimestamps = !App->GetDisplay24HourTimestamps();
+
+	// Update value and save to Windows Registry
+	App->SetDisplay24HourTimestamps(Display24HourTimestamps);
+
+	// Update the menu item
+	CheckMenuItem(m_Menu, MENU_VIEW_24HOURTIMESTAMPS, Display24HourTimestamps ? MF_CHECKED : MF_UNCHECKED);
+
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandViewDisplayVMSpeed(VOID)
+{
+	BOOL DisplayVMSpeedUpdates = !App->GetDisplayVMSpeed();
+
+	// Update value and save to Windows Registry
+	App->SetDisplayVMSpeed(DisplayVMSpeedUpdates);
+
+	// Update the menu item
+	CheckMenuItem(m_Menu, MENU_VIEW_DISPLAYVMSPEED, DisplayVMSpeedUpdates ? MF_CHECKED : MF_UNCHECKED);
+
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandConnectionConnectOnStartup(VOID)
+{
+	BOOL ConnectOnStartup = !App->GetConnectOnStartup();
+
+	// Update value and save to Windows Registry
+	App->SetConnectOnStartup(ConnectOnStartup);
+
+	// Update the menu item
+	CheckMenuItem(m_Menu, MENU_CONNECTION_CONNECTONSTARTUP, ConnectOnStartup ? MF_CHECKED : MF_UNCHECKED);
+
+	return TRUE;
+}
+
 INT_PTR MainDialog::OnCommandConnectionDisconnect(VOID)
 {
 	m_CronusZen.DisconnectFromDevice();
 	m_CronusZen.SetConnectionState(CronusZen::Disconnected);
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandConnectionLowPerformanceMode(VOID)
+{
+	BOOL LowPerformanceMode = !App->GetLowPerformanceMode();
+
+	// Update value and save to Windows Registry
+	App->SetLowPerformanceMode(LowPerformanceMode);
+
+	// Update the menu item
+	CheckMenuItem(m_Menu, MENU_CONNECTION_LOWPERFORMANCEMODE, LowPerformanceMode ? MF_CHECKED : MF_UNCHECKED);
+
 	return TRUE;
 }
 
@@ -480,12 +552,6 @@ INT_PTR MainDialog::OnCommandDeviceEopPlayStation3(VOID)
 INT_PTR MainDialog::OnCommandDeviceEopPlayStation4(VOID)
 {
 	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::PlayStation4);
-	return TRUE;
-}
-
-INT_PTR MainDialog::OnCommandDeviceEopPlayStation5(VOID)
-{
-	m_CronusZen.SetFragment(CronusZen::OutputMode, CronusZen::PlayStation5);
 	return TRUE;
 }
 
@@ -576,6 +642,16 @@ INT_PTR MainDialog::OnCommandHelpZenPPNews(VOID)
 {
 	App->GetVersionCheck().DisplayNews();
 	return TRUE;
+}
+
+INT_PTR MainDialog::OnCtlColorDlg(CONST WPARAM wParam)
+{
+	if (App->GetBlackBackground()) {
+		SetBkColor(reinterpret_cast<HDC>(wParam), BLACK);
+		return reinterpret_cast<INT_PTR>(GetStockObject(BLACK_BRUSH));
+	} else {
+		return static_cast<INT_PTR>(FALSE);
+	}
 }
 
 INT_PTR MainDialog::OnCtlColorListBox(CONST WPARAM wParam)
@@ -677,8 +753,15 @@ INT_PTR MainDialog::OnInitDialog(VOID)
 	// Register device change notifications
 	RegisterDeviceNotifications(m_CronusZen.GetGUID());
 
-	// Update slots manager information
+	// Update slots manager information5
 	UpdateSlotsData(0, 1);
+
+	// Update menus based on user settings
+	CheckMenuItem(m_Menu, MENU_CONNECTION_CONNECTONSTARTUP, App->GetConnectOnStartup() ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(m_Menu, MENU_CONNECTION_LOWPERFORMANCEMODE, App->GetLowPerformanceMode() ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(m_Menu, MENU_VIEW_24HOURTIMESTAMPS, App->GetDisplay24HourTimestamps() ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(m_Menu, MENU_VIEW_BLACKBACKGROUND, App->GetBlackBackground() ? MF_CHECKED : MF_UNCHECKED);
+	CheckMenuItem(m_Menu, MENU_VIEW_DISPLAYVMSPEED, App->GetDisplayVMSpeed() ? MF_CHECKED : MF_UNCHECKED);
 
 	return TRUE;
 }
