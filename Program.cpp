@@ -72,14 +72,14 @@ BOOLEAN Program::InitializeProgram(VOID)
 		// Initialize objects
 		m_CronusZen = std::make_unique<CronusZen>();
 		m_MainDialog = std::make_unique<MainDialog>();
-		m_Registry = std::make_unique<Registry>(L"Software\\Asgard Productions\\Zen++\\");
+		m_Registry = std::make_unique<Registry>(L"Software\\Asgard Productions\\");
 
 		// Read configuration data
 		ReadUserVariables();
 
 		// Delete update and download files
-		DeleteFile(L"Zen.exe");
 		DeleteFile(L"ZppUpdater.exe");
+		DeleteFile(L"..\\ZppUpdater.exe");
 
 		// Create dialog
 		m_MainDialog->Create(DIALOG_MAIN);
@@ -115,7 +115,6 @@ BOOLEAN Program::InitializeProgram(VOID)
 //#ifndef _DEBUG
 		m_VersionCheck->CheckUpdatesAndNews();
 //#endif
-
 	}
 	catch (CONST std::wstring& CustomMessage)
 	{

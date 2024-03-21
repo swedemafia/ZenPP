@@ -232,4 +232,10 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="file1.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\ZppUpdater\Release\ZppUpdater.exe" />
+  </ItemGroup>
 </Project>

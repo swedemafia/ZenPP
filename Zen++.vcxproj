@@ -227,6 +227,10 @@
     <Image Include="FirmwareStep2.bmp" />
     <Image Include="icon.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\ZppUpdater\Release\ZppUpdater.exe" />
+    <None Include="file1.bin" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

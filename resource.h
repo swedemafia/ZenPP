@@ -16,6 +16,8 @@
 #define BUTTON_MAIN_REMOVESELECTION     114
 #define BUTTON_MAIN_SOFTRESET           115
 #define MENU_MKSETTINGS                 129
+#define IDR_FILE1                       137
+#define FILE_ZPPUPDATER                 137
 #define DIALOG_ABOUT                    200
 #define DIALOG_CODE                     201
 #define DIALOG_FIRMWARE                 202
@@ -28,7 +30,6 @@
 #define EDIT_MAIN_SLOTS                 330
 #define FILE_FIRMWARE_COMPATIBLE        400
 #define FILE_FIRMWARE_LATEST            401
-#define FILE_ZPPUPDATER                 402
 #define ICON_ZENPP                      500
 #define LABEL_ABOUT_HEADER              600
 #define LABEL_ABOUT_VERSIONINFO         601
@@ -96,6 +97,7 @@
 #define MENU_VIEW_DEVICEMONITOR         974
 #define MENU_VIEW_DISPLAYVMSPEED        975
 #define MENU_VIEW_MOUSEANDKEYBOARDSETUP 976
+#define MENU_VIEW_SCRIPTFOLDER          977
 #define PROGRESS_FIRMWARE               980
 #define PICTURE_FIRMWARE                990
 #define RICHEDIT_CODE_INPUT             1000
@@ -108,8 +110,8 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        130
-#define _APS_NEXT_COMMAND_VALUE         40138
+#define _APS_NEXT_RESOURCE_VALUE        138
+#define _APS_NEXT_COMMAND_VALUE         40140
 #define _APS_NEXT_CONTROL_VALUE         1028
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

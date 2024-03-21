@@ -18,15 +18,15 @@ DWORD HttpSessionBase::HttpSessionThreadProc(LPVOID Parameter)
 	try {
 		// Open HTTP session
 		if (!(Session = WinHttpOpen(L"Zen++ HTTP Client", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)))
-			throw std::wstring(L"An error occured  a HTTP session.");
+			throw std::wstring(L"An error occured while opening a HTTP session.");
 
 		// Connect to host
 		if (!(Connection = WinHttpConnect(Session, Base->m_Domain.c_str(), INTERNET_DEFAULT_HTTP_PORT, 0)))
-			throw std::wstring(L"An error occured while  a connection to the HTTP host.");
+			throw std::wstring(L"An error occured while opening a connection to the HTTP host.");
 
 		// Request the file
 		if (!(Request = WinHttpOpenRequest(Connection, L"GET", Base->m_PathToFile.c_str(), NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, 0)))
-			throw std::wstring(L"An error occured while  a HTTP request.");
+			throw std::wstring(L"An error occured while opening a HTTP request.");
 
 		// Send the request
 		if (!WinHttpSendRequest(Request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0))

@@ -211,6 +211,7 @@ INT_PTR MainDialog::HandleMessage(CONST UINT Message, CONST WPARAM wParam, CONST
 	switch (Message) {
 	case WM_CLOSE:									return Dialog->OnClose();
 	case WM_COMMAND:								return Dialog->OnCommand(wParam, lParam);
+	case WM_COPYDATA:								return Dialog->OnCopyData(lParam);
 	case WM_CTLCOLORDLG:							return Dialog->OnCtlColorDlg(wParam);
 	case WM_CTLCOLORLISTBOX:						return Dialog->OnCtlColorListBox(wParam);
 	case WM_CTLCOLORSTATIC:							return Dialog->OnCtlColorStatic(wParam);
@@ -304,8 +305,56 @@ INT_PTR MainDialog::OnCommand(CONST WPARAM wParam, CONST LPARAM lParam)
 	case MENU_VIEW_24HOURTIMESTAMPS:				return OnCommandViewDisplay24HourTimestamps();
 	case MENU_VIEW_BLACKBACKGROUND:					return OnCommandViewBlackBackground();
 	case MENU_VIEW_DISPLAYVMSPEED:					return OnCommandViewDisplayVMSpeed();
+	case MENU_VIEW_SCRIPTFOLDER:					return OnCommandViewScriptFolder();
 	}
 	return FALSE;
+}
+
+// Method for processing an external command sent to the window
+INT_PTR MainDialog::OnCopyData(CONST LPARAM lParam)
+{
+	PCOPYDATASTRUCT CopyData = reinterpret_cast<PCOPYDATASTRUCT>(lParam);
+
+	if (CopyData == nullptr)
+		return -1; // Invalid data was provided
+
+	// Variables for ease of accessibility
+	CONST CronusZen& Cronus = App->GetCronusZen();
+	MainDialog& MainDialog = App->GetMainDialog();
+
+	// 0 is SlotAdd command
+	if (CopyData->dwData == 0) {
+		std::wstring FilePath;
+
+		// Allocate space for copying
+		FilePath.resize(CopyData->cbData);
+
+		// Copy the lpData to the filepath variable
+		std::memcpy(FilePath.data(), CopyData->lpData, CopyData->cbData);
+
+		// Determine if the Cronus is connected or not and also check for appropriate firmware
+		if (Cronus.GetConnectionState() == CronusZen::Connected) {
+			// Validate device is on compatible firmware
+			if (Cronus.GetFirmwareVersion().IsBeta()) {
+				// Check slot availability and attempt to add it to your Zen
+				if (m_CronusZen.SlotsUsed() == 8) {
+					return 3; // No slots available
+				} else {
+					// Notify user that a message has been received and being handled
+					MainDialog.PrintTimestamp();
+					MainDialog.PrintText(TEAL, L"Adding script from external source: %ws.\r\n", FilePath.c_str());
+
+					m_CronusZen.SlotsAdd(FilePath.c_str());
+				}
+			} else {
+				return 2; // User is not on beta firmware
+			}
+		} else {
+			return 1; // Cronus is not connected
+		}
+	}
+
+	return 0; // Action was successful
 }
 
 // Method for processing the "Add Script" command button
@@ -314,7 +363,7 @@ INT_PTR MainDialog::OnCommandMainAddScript(VOID)
 	if (m_CronusZen.SlotsUsed() == 8) {
 		MessageBox(m_hWnd, L"You are unable to add more than 8 scripts to your Cronus Zen!\r\n\r\n- Select some scripts in the listbox.\r\n- Press \"Remove Selected Scripts.\"\r\n- Press \"Program Device.\"\r\n- Try adding a new script again.", L"Slots Manager", MB_ICONERROR | MB_OK);
 	} else {
-		m_CronusZen.SlotsAdd();
+		m_CronusZen.SlotsAdd(L"");
 	}
 
 	return TRUE;
@@ -433,6 +482,35 @@ INT_PTR MainDialog::OnCommandViewDisplayVMSpeed(VOID)
 
 	// Update the menu item
 	CheckMenuItem(m_Menu, MENU_VIEW_DISPLAYVMSPEED, DisplayVMSpeedUpdates ? MF_CHECKED : MF_UNCHECKED);
+
+	return TRUE;
+}
+
+INT_PTR MainDialog::OnCommandViewScriptFolder(VOID)
+{
+	// Prepare SHELLEXECUTEINFO
+	SHELLEXECUTEINFO ShellInfo = { 0 };
+
+	// Build SHELLEXECUTE structure
+	ShellInfo.cbSize = sizeof(SHELLEXECUTEINFO);
+	ShellInfo.fMask = SEE_MASK_ASYNCOK;
+	ShellInfo.hwnd = m_hWnd;
+	ShellInfo.lpVerb = L"open";
+	ShellInfo.lpFile = L"SlotData";
+	ShellInfo.nShow = SW_SHOWDEFAULT;
+
+	if (!ShellExecuteEx(&ShellInfo))
+		App->DisplayError(L"Unable to open the SlotData folder.");
+
+	/*COPYDATASTRUCT cds = {NULL};
+	std::wstring test = L"C:\\Programming\\pedro.bin";
+
+	cds.dwData = 0;
+	cds.lpData = test.data();
+	cds.cbData = test.size() << 1;
+
+	SendMessage(m_hWnd, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds));
+	*/
 
 	return TRUE;
 }

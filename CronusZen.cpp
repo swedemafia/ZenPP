@@ -1854,7 +1854,7 @@ VOID CronusZen::SendInitialCommunication(VOID)
 }
 
 // Method used for adding a script to be programmed to the device
-VOID CronusZen::SlotsAdd(VOID)
+VOID CronusZen::SlotsAdd(CONST std::wstring& FullPathToBin)
 {
 	// Initialize variable for ease of accessibility
 	MainDialog& MainDialog = App->GetMainDialog();
@@ -1869,16 +1869,17 @@ VOID CronusZen::SlotsAdd(VOID)
 	OpenFileName.lpstrFile = FilePath;
 	OpenFileName.nMaxFile = MAX_PATH;
 	OpenFileName.lpstrFilter = L"Compiled Scripts (*.bin)\0*.bin\0";
+	OpenFileName.lpstrInitialDir = L"SlotData";
 	OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_FILEMUSTEXIST | OFN_DONTADDTORECENT | OFN_NOCHANGEDIR;
 
 	// Open the dialog and capture the file the user selects
-	if (GetOpenFileName(&OpenFileName)) {
+	if (FullPathToBin.size() || GetOpenFileName(&OpenFileName)) {
 
 		// TODO: check for file size exceeding limit of the Cronus Zen
 		
 		// Initialize variables used for processing the incoming file
 		MainDialog::ListBoxItem* ListBoxItem = new MainDialog::ListBoxItem{ NULL };
-		std::wstring StrFilePath = FilePath;
+		std::wstring StrFilePath = FullPathToBin.size() ? FullPathToBin : FilePath;
 		std::size_t LastSlash = StrFilePath.rfind(L"\\");
 		UCHAR SlotToWrite = 0;
 

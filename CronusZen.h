@@ -175,7 +175,7 @@ public:
 	VOID QueueCommand(_In_ CONST UCHAR Count, _In_ CONST USHORT Size, _In_ CommandBase& Command);
 
 	// Public method for slots configuration management
-	VOID SlotsAdd(VOID);
+	VOID SlotsAdd(_In_opt_ CONST std::wstring& FullPathToBin);
 	VOID SlotsRemove(_In_ CONST UINT Slot);
 	VOID SlotsProgram(VOID);
 	CONST UCHAR SlotsUsed(VOID) CONST;

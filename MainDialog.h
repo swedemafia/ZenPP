@@ -114,10 +114,12 @@ private:
 	INT_PTR OnCommandViewBlackBackground(VOID);
 	INT_PTR OnCommandViewDisplay24HourTimestamps(VOID);
 	INT_PTR OnCommandViewDisplayVMSpeed(VOID);
+	INT_PTR OnCommandViewScriptFolder(VOID);
 
 	// Private methods for handling specific window messages
 	INT_PTR OnClose(VOID);
 	INT_PTR OnCommand(_In_ CONST WPARAM wParam, _In_ CONST LPARAM lParam);
+	INT_PTR OnCopyData(_In_ CONST LPARAM lParam);
 	INT_PTR OnCtlColorDlg(_In_ CONST WPARAM wParam);
 	INT_PTR OnCtlColorListBox(_In_ CONST WPARAM wParam);
 	INT_PTR OnCtlColorStatic(_In_ CONST WPARAM wParam);
